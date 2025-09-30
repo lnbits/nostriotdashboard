@@ -10,7 +10,7 @@ window.app = Vue.createApp({
       userPubkey: null,
       
       // Nostr
-      relays: ['wss://relay.damus.io', 'wss://relay.nostriot.com'],
+      relays: ['wss://relay.damus.io'],
       pool: null,
       
       // IoT Devices
@@ -143,6 +143,7 @@ window.app = Vue.createApp({
         }
         
         const events = await this.pool.querySync(this.relays, filter)
+        console.log('Fetched DVM advertisement events:', events)
         this.iotDevices = []
         
         for (const event of events) {
