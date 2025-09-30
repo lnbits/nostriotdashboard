@@ -10,7 +10,7 @@ window.app = Vue.createApp({
       userPubkey: null,
       
       // Nostr
-      relays: ['wss://relay.damus.io'],
+      relays: ['wss://relay.nostriot.com'],
       pool: null,
       
       // IoT Devices
@@ -295,7 +295,7 @@ window.app = Vue.createApp({
       const stateKey = `${device.pubkey}:${capability}`
       
       try {
-        // Listen for DVM response events (kind 7000)
+        // Listen for DVM response events (kind 6107)
         const filter = {
           kinds: [6107],
           authors: [device.pubkey],
@@ -306,6 +306,8 @@ window.app = Vue.createApp({
         // Set up subscription
         const sub = this.pool.subscribe(this.relays, filter, {
           onevent: async (event) => {
+            // Clear timeout and close subscription since we got a response
+            clearTimeout(timeoutId)
             
             try {
               console.log('Received DVM response event:', event)
@@ -349,7 +351,7 @@ window.app = Vue.createApp({
         })
         
         // Timeout after 30 seconds
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           sub.close()
           this.setCapabilityState(stateKey, { 
             loading: false, 
