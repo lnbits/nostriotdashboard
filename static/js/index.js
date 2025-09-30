@@ -4,239 +4,343 @@ window.app = Vue.createApp({
   delimiters: ['${', '}'],
   data: function () {
     return {
-      invoiceAmount: 10,
-      qrValue: '',
-      myex: [],
-      myexTable: {
-        columns: [
-          {name: 'id', align: 'left', label: 'ID', field: 'id'},
-          {name: 'name', align: 'left', label: 'Name', field: 'name'},
-          {
-            name: 'wallet',
-            align: 'left',
-            label: 'Wallet',
-            field: 'wallet'
-          },
-          {
-            name: 'total',
-            align: 'left',
-            label: 'Total sent/received',
-            field: 'total'
-          }
-        ],
-        pagination: {
-          rowsPerPage: 10
-        }
-      },
-      formDialog: {
+      // Authentication
+      isAuthenticated: false,
+      connecting: false,
+      userPubkey: null,
+      
+      // Nostr
+      relays: ['wss://relay.damus.io'],
+      pool: null,
+      
+      // IoT Devices
+      iotDevices: [],
+      loadingDevices: false,
+      followList: [],
+      
+      // UI State
+      capabilityStates: new Map(),
+      
+      // Modals
+      invoiceDialog: {
         show: false,
-        data: {},
-        advanced: {}
+        qrCode: ''
       },
-      urlDialog: {
+      relayDialog: {
         show: false,
-        data: {}
+        url: ''
       }
     }
   },
-
-  ///////////////////////////////////////////////////
-  ////////////////METHODS FUNCTIONS//////////////////
-  ///////////////////////////////////////////////////
 
   methods: {
-    async closeFormDialog() {
-      this.formDialog.show = false
-      this.formDialog.data = {}
-    },
-    async getNostriotDashboards() {
-      await LNbits.api
-        .request(
-          'GET',
-          '/nostriotdashboard/api/v1/myex',
-          this.g.user.wallets[0].inkey
-        )
-        .then(response => {
-          this.myex = response.data
-        })
-        .catch(err => {
-          LNbits.utils.notifyApiError(err)
-        })
-    },
-    async sendNostriotDashboardData() {
-      const data = {
-        name: this.formDialog.data.name,
-        lnurlwithdrawamount: this.formDialog.data.lnurlwithdrawamount,
-        lnurlpayamount: this.formDialog.data.lnurlpayamount
-      }
-      const wallet = _.findWhere(this.g.user.wallets, {
-        id: this.formDialog.data.wallet
-      })
-      if (this.formDialog.data.id) {
-        data.id = this.formDialog.data.id
-        data.total = this.formDialog.data.total
-        await this.updateNostriotDashboard(wallet, data)
-      } else {
-        await this.createNostriotDashboard(wallet, data)
-      }
-    },
-
-    async updateNostriotDashboardForm(tempId) {
-      const nostriotdashboard = _.findWhere(this.myex, {id: tempId})
-      this.formDialog.data = {
-        ...nostriotdashboard
-      }
-      if (this.formDialog.data.tip_wallet != '') {
-        this.formDialog.advanced.tips = true
-      }
-      if (this.formDialog.data.withdrawlimit >= 1) {
-        this.formDialog.advanced.otc = true
-      }
-      this.formDialog.show = true
-    },
-    async createNostriotDashboard(wallet, data) {
-      data.wallet = wallet.id
-      await LNbits.api
-        .request('POST', '/nostriotdashboard/api/v1/myex', wallet.adminkey, data)
-        .then(response => {
-          this.myex.push(response.data)
-          this.closeFormDialog()
-        })
-        .catch(error => {
-          LNbits.utils.notifyApiError(error)
-        })
-    },
-
-    async updateNostriotDashboard(wallet, data) {
-      data.wallet = wallet.id
-      await LNbits.api
-        .request(
-          'PUT',
-          `/nostriotdashboard/api/v1/myex/${data.id}`,
-          wallet.adminkey,
-          data
-        )
-        .then(response => {
-          this.myex = _.reject(this.myex, obj => obj.id == data.id)
-          this.myex.push(response.data)
-          this.closeFormDialog()
-        })
-        .catch(error => {
-          LNbits.utils.notifyApiError(error)
-        })
-    },
-    async deleteNostriotDashboard(tempId) {
-      var nostriotdashboard = _.findWhere(this.myex, {id: tempId})
-      const wallet = _.findWhere(this.g.user.wallets, {
-        id: nostriotdashboard.wallet
-      })
-      await LNbits.utils
-        .confirmDialog('Are you sure you want to delete this NostriotDashboard?')
-        .onOk(function () {
-          LNbits.api
-            .request(
-              'DELETE',
-              '/nostriotdashboard/api/v1/myex/' + tempId,
-              wallet.adminkey
-            )
-            .then(() => {
-              this.myex = _.reject(this.myex, function (obj) {
-                return obj.id === nostriotdashboard.id
-              })
-            })
-            .catch(error => {
-              LNbits.utils.notifyApiError(error)
-            })
-        })
-    },
-
-    async exportCSV() {
-      await LNbits.utils.exportCSV(this.myexTable.columns, this.myex)
-    },
-    async itemsArray(tempId) {
-      const nostriotdashboard = _.findWhere(this.myex, {id: tempId})
-      return [...nostriotdashboard.itemsMap.values()]
-    },
-    async openformDialog(id) {
-      const [tempId, itemId] = id.split(':')
-      const nostriotdashboard = _.findWhere(this.myex, {id: tempId})
-      if (itemId) {
-        const item = nostriotdashboard.itemsMap.get(id)
-        this.formDialog.data = {
-          ...item,
-          nostriotdashboard: tempId
+    // Nostr Authentication
+    async connectNostr() {
+      this.connecting = true
+      try {
+        if (!window.nostr) {
+          throw new Error('Nostr browser extension not found')
         }
-      } else {
-        this.formDialog.data.nostriotdashboard = tempId
-      }
-      this.formDialog.data.currency = nostriotdashboard.currency
-      this.formDialog.show = true
-    },
-    async openUrlDialog(tempid) {
-      this.urlDialog.data = _.findWhere(this.myex, {id: tempid})
-      this.qrValue = this.urlDialog.data.lnurlpay
-
-      // Connecting to our websocket fired in tasks.py
-      this.connectWebocket(this.urlDialog.data.id)
-
-      this.urlDialog.show = true
-    },
-    async closeformDialog() {
-      this.formDialog.show = false
-      this.formDialog.data = {}
-    },
-    async createInvoice(tempid) {
-      ///////////////////////////////////////////////////
-      ///Simple call to the api to create an invoice/////
-      ///////////////////////////////////////////////////
-      myex = _.findWhere(this.myex, {id: tempid})
-      const wallet = _.findWhere(this.g.user.wallets, {id: myex.wallet})
-      const data = {
-        nostriotdashboard_id: tempid,
-        amount: this.invoiceAmount,
-        memo: 'NostriotDashboard - ' + myex.name
-      }
-      await LNbits.api
-        .request('POST', `/nostriotdashboard/api/v1/myex/payment`, wallet.inkey, data)
-        .then(response => {
-          this.qrValue = response.data.payment_request
-          this.connectWebocket(wallet.inkey)
+        
+        this.userPubkey = await window.nostr.getPublicKey()
+        this.isAuthenticated = true
+        
+        // Initialize SimplePool
+        this.pool = new window.NostrTools.SimplePool()
+        
+        // Fetch follow list and devices
+        await this.fetchFollowList()
+        await this.discoverIoTDevices()
+        
+        this.$q.notify({
+          type: 'positive',
+          message: 'Connected to Nostr successfully'
         })
-        .catch(error => {
-          LNbits.utils.notifyApiError(error)
+      } catch (error) {
+        console.error('Nostr connection failed:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to connect to Nostr: ' + error.message
         })
+      }
+      this.connecting = false
     },
-    connectWebocket(nostriotdashboard_id) {
-      //////////////////////////////////////////////////
-      ///wait for pay action to happen and do a thing////
-      ///////////////////////////////////////////////////
-      if (location.protocol !== 'http:') {
-        localUrl =
-          'wss://' +
-          document.domain +
-          ':' +
-          location.port +
-          '/api/v1/ws/' +
-          nostriotdashboard_id
-      } else {
-        localUrl =
-          'ws://' +
-          document.domain +
-          ':' +
-          location.port +
-          '/api/v1/ws/' +
-          nostriotdashboard_id
+
+    // Relay Management
+    addRelay() {
+      this.relayDialog.show = true
+      this.relayDialog.url = ''
+    },
+
+    confirmAddRelay() {
+      if (this.relayDialog.url && !this.relays.includes(this.relayDialog.url)) {
+        this.relays.push(this.relayDialog.url)
+        console.log('Added relay:', this.relayDialog.url)
       }
-      this.connection = new WebSocket(localUrl)
-      this.connection.onmessage = () => {
-        this.urlDialog.show = false
+      this.relayDialog.show = false
+    },
+
+    removeRelay(relayUrl) {
+      this.relays = this.relays.filter(r => r !== relayUrl)
+      console.log('Removed relay:', relayUrl)
+    },
+
+    // Fetch user's follow list (NIP-02)
+    async fetchFollowList() {
+      try {
+        const filter = {
+          kinds: [3],
+          authors: [this.userPubkey],
+          limit: 1
+        }
+        
+        const events = await this.pool.querySync(this.relays, filter)
+        console.log('Fetched follow list events:', events)
+        if (events.length > 0) {
+          const followEvent = events[0]
+          this.followList = followEvent.tags
+            .filter(tag => tag[0] === 'p')
+            .map(tag => tag[1])
+          console.log('Follow list:', this.followList.length, 'accounts')
+        } else {
+          console.log('No follow list found')
+        }
+      } catch (error) {
+        console.error('Failed to fetch follow list:', error)
+        this.$q.notify({
+          type: 'warning',
+          message: 'Could not fetch follow list'
+        })
       }
+    },
+
+    // Discover IoT devices from follow list
+    async discoverIoTDevices() {
+      if (!this.followList.length) {
+        this.$q.notify({
+          type: 'info',
+          message: 'No follows found. Follow some Nostr accounts that provide IoT services.'
+        })
+        return
+      }
+
+      this.loadingDevices = true
+      try {
+        // Query for DVM advertisements (kind 31990)
+        const filter = {
+          kinds: [31990],
+          authors: this.followList
+        }
+        
+        const events = await this.pool.querySync(this.relays, filter)
+        this.iotDevices = []
+        
+        for (const event of events) {
+          // Filter for IoT devices (tag 'k' = '5107')
+          const kTag = event.tags.find(tag => tag[0] === 'k' && tag[1] === '5107')
+          if (kTag) {
+            const device = this.parseIoTDevice(event)
+            if (device) {
+              this.iotDevices.push(device)
+            }
+          }
+        }
+        
+        console.log('Discovered IoT devices:', this.iotDevices)
+        
+        if (this.iotDevices.length === 0) {
+          this.$q.notify({
+            type: 'info',
+            message: 'No IoT devices found in your follow list'
+          })
+        }
+      } catch (error) {
+        console.error('Failed to discover IoT devices:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to discover IoT devices'
+        })
+      }
+      this.loadingDevices = false
+    },
+
+    // Parse IoT device from DVM advertisement
+    parseIoTDevice(event) {
+      try {
+        const content = JSON.parse(event.content)
+        const capabilitiesTag = event.tags.find(tag => tag[0] === 't')
+        const capabilities = capabilitiesTag ? capabilitiesTag.slice(1) : []
+        
+        return {
+          pubkey: event.pubkey,
+          name: content.name || 'Unknown Device',
+          about: content.about || 'No description',
+          capabilities: capabilities
+        }
+      } catch (error) {
+        console.error('Failed to parse device:', error)
+        return null
+      }
+    },
+
+    // Execute capability (send DVM request)
+    async executeCapability(device, capability) {
+      const stateKey = `${device.pubkey}:${capability}`
+      this.setCapabilityState(stateKey, { loading: true })
+
+      const method = JSON.stringify([{ method: capability }])
+
+      try {
+        // Create DVM request event (kind 5107)
+        const event = {
+          kind: 5107,
+          content: "",
+          tags: [
+            ['i',  method, 'text'],
+            ['output', 'text/plain'],
+            ['relays', ...this.relays],
+            ['p', device.pubkey]
+          ],
+          created_at: Math.floor(Date.now() / 1000),
+          pubkey: this.userPubkey
+        }
+        
+        // Sign and publish the event
+        const signedEvent = await window.nostr.signEvent(event)
+        
+        // Publish using SimplePool
+        await this.pool.publish(this.relays, signedEvent)
+        console.log('Published DVM request for capability:', capability)
+        
+        // Listen for DVM response
+        this.listenForDVMResponse(device, capability, signedEvent.id)
+        
+      } catch (error) {
+        console.error('Failed to execute capability:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to execute ' + capability
+        })
+        this.setCapabilityState(stateKey, { loading: false })
+      }
+    },
+
+    // Listen for DVM response
+    listenForDVMResponse(device, capability, requestId) {
+      const stateKey = `${device.pubkey}:${capability}`
+      
+      try {
+        // Listen for DVM response events (kind 7000)
+        const filter = {
+          kinds: [6107],
+          authors: [device.pubkey],
+          '#e': [requestId],
+          since: Math.floor(Date.now() / 1000)
+        }
+        
+        // Set up subscription
+        const sub = this.pool.subscribe(this.relays, filter, {
+          onevent: async (event) => {
+            // Stop subscription
+            sub.close()
+            
+            try {
+              // Check if response contains bolt11 invoice
+              const bolt11Tag = event.tags.find(tag => tag[0] === 'bolt11')
+              if (bolt11Tag) {
+                // Display invoice QR code
+                await this.showInvoiceQR(bolt11Tag[1])
+                this.setCapabilityState(stateKey, { 
+                  loading: false, 
+                  result: 'Payment required' 
+                })
+              } else {
+                // Display response content
+                this.setCapabilityState(stateKey, { 
+                  loading: false, 
+                  result: event.content || 'Success' 
+                })
+                
+                if (event.content) {
+                  this.$q.notify({
+                    type: 'positive',
+                    message: `${capability}: ${event.content}`
+                  })
+                }
+              }
+            } catch (error) {
+              console.error('Error processing DVM response:', error)
+              this.setCapabilityState(stateKey, { 
+                loading: false, 
+                result: 'Error processing response' 
+              })
+            }
+          },
+          oneose: () => {
+            console.log('End of stored events for DVM response')
+          }
+        })
+        
+        // Timeout after 30 seconds
+        setTimeout(() => {
+          sub.close()
+          this.setCapabilityState(stateKey, { 
+            loading: false, 
+            result: 'Timeout - no response' 
+          })
+        }, 30000)
+        
+      } catch (error) {
+        console.error('Failed to listen for DVM response:', error)
+        this.setCapabilityState(stateKey, { loading: false })
+      }
+    },
+
+    // Show invoice QR code
+    async showInvoiceQR(bolt11) {
+      try {
+        // Generate QR code for bolt11 invoice
+        const qrCode = await QRCode.toDataURL(bolt11)
+        this.invoiceDialog.qrCode = qrCode
+        this.invoiceDialog.show = true
+      } catch (error) {
+        console.error('Failed to generate QR code:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to display invoice QR code'
+        })
+      }
+    },
+
+    // Capability state management
+    setCapabilityState(key, state) {
+      this.capabilityStates.set(key, state)
+      // Force Vue reactivity update
+      this.$forceUpdate()
+    },
+
+    isCapabilityLoading(pubkey, capability) {
+      const state = this.capabilityStates.get(`${pubkey}:${capability}`)
+      return state?.loading || false
+    },
+
+    getCapabilityResult(pubkey, capability) {
+      const state = this.capabilityStates.get(`${pubkey}:${capability}`)
+      return state?.result || null
+    },
+
+    // Refresh devices
+    async refreshDevices() {
+      await this.fetchFollowList()
+      await this.discoverIoTDevices()
     }
   },
-  ///////////////////////////////////////////////////
-  //////LIFECYCLE FUNCTIONS RUNNING ON PAGE LOAD/////
-  ///////////////////////////////////////////////////
+
   async created() {
-    await this.getNostriotDashboards()
+    // Check if required libraries are loaded
+    console.log('NostrTools available:', typeof window.NostrTools !== 'undefined')
+    console.log('SimplePool available:', typeof window.NostrTools?.SimplePool !== 'undefined')
+    console.log('QRCode available:', typeof window.QRCode !== 'undefined')
+    console.log('Nostr extension available:', typeof window.nostr !== 'undefined')
   }
 })

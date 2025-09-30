@@ -1,6 +1,6 @@
 {
   "name": "NostriotDashboard",
-  "short_description": "Minimal extension to build on",
+  "short_description": "Interact with Nostr IoT devices using DVM protocol",
   "tile": "/nostriotdashboard/static/image/nostriotdashboard.png",
   "min_lnbits_version": "1.3.0",
   "contributors": [

@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "prettier": "^3.2.5",
-    "pyright": "^1.1.358"
+    "pyright": "^1.1.358",
+    "@nostr-dev-kit/ndk": "^2.7.0"
   }
 }

@@ -4,240 +4,171 @@
 
 {% extends "base.html" %} {% from "macros.jinja" import window_vars with context
 %} {% block scripts %} {{ window_vars(user) }}
+<script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="{{ static_url_for('nostriotdashboard/static', path='js/index.js') }}"></script>
 {% endblock %} {% block page %}
-<div class="row q-col-gutter-md" id="makeItRain">
-  <div class="col-12 col-md-8 col-lg-7 q-gutter-y-md">
-    <q-card>
-      <q-card-section>
-        <q-btn unelevated color="primary" @click="formDialog.show = true"
-          >New NostriotDashboard</q-btn
-        >
-      </q-card-section>
-    </q-card>
 
-    <q-card>
-      <q-card-section>
-        <div class="row items-center no-wrap q-mb-md">
+<div id="vue">
+  <q-layout view="hHh lpR fFf">
+    <q-page-container>
+      <q-page class="q-pa-md">
+        
+        <!-- Header -->
+        <div class="row q-mb-lg">
           <div class="col">
-            <h5 class="text-subtitle1 q-my-none">NostriotDashboard</h5>
-          </div>
-          <div class="col-auto">
-            <q-btn flat color="grey" @click="exportCSV">Export to CSV</q-btn>
+            <h4 class="q-mt-none q-mb-md">Nostr IoT Dashboard</h4>
+            <p class="text-caption">Interact with Nostr IoT devices using DVM protocol</p>
           </div>
         </div>
-        <q-table
-          dense
-          flat
-          :rows="myex"
-          row-key="id"
-          :columns="myexTable.columns"
-          v-model:pagination="myexTable.pagination"
-        >
-          <nostriotdashboard v-slot:header="props">
-            <q-tr :props="props">
-              <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                ${ col.label }
-              </q-th>
-            </q-tr>
-          </nostriotdashboard>
 
-          <template v-slot:body="props">
-            <q-tr :props="props">
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                <div v-if="col.field == 'total'">${ col.value / 1000} sats</div>
-                <div v-else>${ col.value }</div>
-              </q-td>
-              <q-td auto-width>
-                <q-btn
-                  unelevated
-                  dense
-                  size="sm"
-                  icon="qr_code"
-                  :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
-                  class="q-mr-sm"
-                  @click="openUrlDialog(props.row.id)"
-                ></q-btn
-              ></q-td>
-              <q-td auto-width>
-                <q-btn
-                  unelevated
-                  dense
-                  size="sm"
-                  icon="launch"
-                  :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
-                  type="a"
-                  :href="props.row.id"
-                  target="_blank"
-                  ><q-tooltip>Open public page</q-tooltip></q-btn
-                ></q-td
-              >
+        <!-- Authentication Section -->
+        <q-card v-if="!isAuthenticated" class="q-mb-lg">
+          <q-card-section>
+            <h6 class="q-mt-none">Connect with Nostr</h6>
+            <p class="text-caption">Connect your Nostr browser extension to access IoT devices</p>
+            <q-btn 
+              color="primary" 
+              label="Connect Nostr Extension" 
+              @click="connectNostr"
+              :loading="connecting"
+            />
+          </q-card-section>
+        </q-card>
 
-              <q-td>
-                <q-btn
-                  flat
-                  dense
-                  size="xs"
-                  @click="updateNostriotDashboardForm(props.row.id)"
-                  icon="edit"
-                  color="light-blue"
-                >
-                  <q-tooltip> Edit copilot </q-tooltip>
-                </q-btn>
-              </q-td>
-
-              <q-td>
-                <q-btn
-                  flat
-                  dense
-                  size="xs"
-                  @click="deleteNostriotDashboard(props.row.id)"
-                  icon="cancel"
-                  color="pink"
-                >
-                  <q-tooltip> Delete copilot </q-tooltip>
-                </q-btn>
-              </q-td>
-            </q-tr>
-          </template>
-        </q-table>
-      </q-card-section>
-    </q-card>
-  </div>
-
-  <div class="col-12 col-md-4 col-lg-5 q-gutter-y-md">
-    <q-card>
-      <q-card-section>
-        <h6 class="text-subtitle1 q-my-none">
-          {{SITE_TITLE}} NostriotDashboard extension
-        </h6>
-        <p>
-          Simple extension you can use as a base for your own extension. <br />
-          Includes very simple LNURL-pay and LNURL-withdraw example.
-        </p>
-      </q-card-section>
-      <q-card-section class="q-pa-none">
-        <q-separator></q-separator>
-        <q-list>
-          {% include "nostriotdashboard/_api_docs.html" %}
-          <q-separator></q-separator>
-          {% include "nostriotdashboard/_nostriotdashboard.html" %}
-        </q-list>
-      </q-card-section>
-    </q-card>
-  </div>
-
-  <!--/////////////////////////////////////////////////-->
-  <!--//////////////FORM DIALOG////////////////////////-->
-  <!--/////////////////////////////////////////////////-->
-
-  <q-dialog v-model="formDialog.show" position="top" @hide="closeFormDialog">
-    <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
-      <q-form @submit="sendNostriotDashboardData" class="q-gutter-md">
-        <q-input
-          filled
-          dense
-          v-model.trim="formDialog.data.name"
-          label="Name"
-          placeholder="Name for your record"
-        ></q-input>
-        <q-select
-          filled
-          dense
-          emit-value
-          v-model="formDialog.data.wallet"
-          :options="g.user.walletOptions"
-          label="Wallet *"
-        ></q-select>
-        <q-input
-          filled
-          dense
-          type="number"
-          v-model.trim="formDialog.data.lnurlwithdrawamount"
-          label="LNURL-withdraw amount"
-        ></q-input>
-        <q-input
-          filled
-          dense
-          type="number"
-          v-model.trim="formDialog.data.lnurlpayamount"
-          label="LNURL-pay amount"
-        ></q-input>
-        <div class="row q-mt-lg">
-          <q-btn
-            v-if="formDialog.data.id"
-            unelevated
-            color="primary"
-            type="submit"
-            >Update NostriotDashboard</q-btn
-          >
-          <q-btn
-            v-else
-            unelevated
-            color="primary"
-            :disable="formDialog.data.name == null || formDialog.data.wallet == null || formDialog.data.lnurlwithdrawamount == null || formDialog.data.lnurlpayamount == null"
-            type="submit"
-            >Create NostriotDashboard</q-btn
-          >
-          <q-btn v-close-popup flat color="grey" class="q-ml-auto"
-            >Cancel</q-btn
-          >
-        </div>
-      </q-form>
-    </q-card>
-  </q-dialog>
-
-  <!--/////////////////////////////////////////////////-->
-  <!--//////////////QR Code DIALOG/////////////////////-->
-  <!--/////////////////////////////////////////////////-->
-
-  <q-dialog v-model="urlDialog.show" position="top">
-    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
-
-        <lnbits-qrcode
-          v-if="qrValue && qrValue.startsWith('lnbc')"
-          :value="qrValue"
-        ></lnbits-qrcode>
-        <lnbits-qrcode-lnurl v-else :url="qrValue"></lnbits-qrcode-lnurl>
-
-      <q-separator></q-separator>
-
-      <div class="row justify-start q-mt-lg">
-        <div class="col col-md-auto">
-          <q-btn
-            outline
-            style="color: primmary"
-            @click="qrValue = urlDialog.data.lnurlpay"
-            >lnurlpay</q-btn
-          >
-        </div>
-        <div class="col col-md-auto">
-          <q-btn
-            outline
-            style="color: primmary"
-            @click="qrValue = urlDialog.data.lnurlwithdraw"
-            >lnurlwithdraw</q-btn
-          >
-        </div>
-        <div class="col q-pl-md">
-          <q-input filled bottom-slots dense v-model="invoiceAmount">
-            <template v-slot:append>
-              <q-btn
-                round
-                @click="createInvoice(urlDialog.data.id)"
-                color="primary"
-                flat
-                icon="add_circle"
+        <!-- Relay Configuration -->
+        <q-card v-if="isAuthenticated" class="q-mb-lg">
+          <q-card-section>
+            <div class="row items-center q-mb-md">
+              <h6 class="q-mt-none q-mb-none col">Relay Configuration</h6>
+              <q-btn 
+                size="sm" 
+                color="primary" 
+                icon="add" 
+                @click="addRelay" 
+                round 
+                dense
               />
-            </template>
-            <template v-slot:hint> Create an invoice </template>
-          </q-input>
+            </div>
+            <div class="row q-gutter-sm">
+              <q-chip 
+                v-for="relay in relays" 
+                :key="relay"
+                :label="relay"
+                removable
+                @remove="removeRelay(relay)"
+                color="primary"
+                text-color="white"
+              />
+            </div>
+          </q-card-section>
+        </q-card>
+
+        <!-- IoT Devices -->
+        <div v-if="isAuthenticated">
+          <div class="row items-center q-mb-md">
+            <h6 class="q-mt-none q-mb-none col">IoT Devices</h6>
+            <q-btn 
+              size="sm" 
+              color="positive" 
+              icon="refresh" 
+              @click="refreshDevices"
+              :loading="loadingDevices"
+              round 
+              dense
+            />
+          </div>
+
+          <!-- Loading State -->
+          <div v-if="loadingDevices" class="text-center q-pa-lg">
+            <q-spinner size="xl" color="primary" />
+            <p class="q-mt-md">Discovering IoT devices...</p>
+          </div>
+
+          <!-- No Devices Found -->
+          <q-card v-else-if="iotDevices.length === 0" class="text-center q-pa-lg">
+            <q-card-section>
+              <q-icon name="device_hub" size="xl" color="grey-5" />
+              <h6 class="q-mt-md q-mb-sm">No IoT devices found</h6>
+              <p class="text-caption">Follow some Nostr accounts that provide IoT services</p>
+            </q-card-section>
+          </q-card>
+
+          <!-- Device List -->
+          <div v-else class="row q-gutter-md">
+            <q-card 
+              v-for="device in iotDevices" 
+              :key="device.pubkey"
+              class="col-12 col-md-6"
+            >
+              <q-card-section>
+                <div class="text-h6">${device.name}</div>
+                <p class="text-caption q-mb-md">${device.about}</p>
+                
+                <div class="q-gutter-xs">
+                  <q-btn
+                    v-for="capability in device.capabilities"
+                    :key="capability"
+                    :label="capability"
+                    size="sm"
+                    color="primary"
+                    outline
+                    @click="executeCapability(device, capability)"
+                    :loading="isCapabilityLoading(device.pubkey, capability)"
+                  >
+                    <span v-if="getCapabilityResult(device.pubkey, capability)" class="q-ml-sm">
+                      ✓
+                    </span>
+                  </q-btn>
+                </div>
+              </q-card-section>
+            </q-card>
+          </div>
         </div>
-      </div>
-      <div class="row q-mt-lg">
-        <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
-      </div>
-    </q-card>
-  </q-dialog>
+
+        <!-- Invoice Modal -->
+        <q-dialog v-model="invoiceDialog.show">
+          <q-card style="min-width: 300px">
+            <q-card-section>
+              <div class="text-h6">Payment Required</div>
+            </q-card-section>
+            <q-card-section class="text-center">
+              <q-img 
+                :src="invoiceDialog.qrCode" 
+                style="max-width: 300px"
+                class="q-mb-md"
+              />
+              <p class="text-caption">Scan QR code to pay</p>
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn flat label="Close" @click="invoiceDialog.show = false" />
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+
+        <!-- Add Relay Modal -->
+        <q-dialog v-model="relayDialog.show">
+          <q-card style="min-width: 300px">
+            <q-card-section>
+              <div class="text-h6">Add Relay</div>
+            </q-card-section>
+            <q-card-section>
+              <q-input 
+                v-model="relayDialog.url" 
+                label="Relay URL"
+                placeholder="wss://relay.example.com"
+              />
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn flat label="Cancel" @click="relayDialog.show = false" />
+              <q-btn color="primary" label="Add" @click="confirmAddRelay" />
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+
+      </q-page>
+    </q-page-container>
+  </q-layout>
 </div>
+
 {% endblock %}
