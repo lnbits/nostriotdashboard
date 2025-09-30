@@ -10,7 +10,7 @@ window.app = Vue.createApp({
       userPubkey: null,
       
       // Nostr
-      relays: ['wss://relay.damus.io'],
+      relays: ['wss://relay.nostriot.com', 'wss://relay.damus.io', 'wss://nostr-pub.wellorder.net'],
       pool: null,
       
       // IoT Devices
@@ -20,6 +20,7 @@ window.app = Vue.createApp({
       
       // UI State
       capabilityStates: new Map(),
+      setMethodInputs: {},
       
       // Modals
       invoiceDialog: {
@@ -35,6 +36,14 @@ window.app = Vue.createApp({
   },
 
   methods: {
+    getReadableCapability(capability) {
+      return capability.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
+    },
+
+    // Check if capability is a set method
+    isSetMethod(capability) {
+      return capability.toLowerCase().startsWith('set')
+    },
     // Nostr Authentication
     async connectNostr() {
       this.connecting = true
@@ -184,7 +193,7 @@ window.app = Vue.createApp({
       }
     },
 
-    // Execute capability (send DVM request)
+    // Execute capability (send DVM request) - for get methods
     async executeCapability(device, capability) {
       const stateKey = `${device.pubkey}:${capability}`
       this.setCapabilityState(stateKey, { loading: true })
@@ -226,6 +235,60 @@ window.app = Vue.createApp({
       }
     },
 
+    // Execute set capability with value
+    async executeSetCapability(device, capability) {
+      const stateKey = `${device.pubkey}:${capability}`
+      const inputKey = `${device.pubkey}:${capability}`
+      const inputValue = this.setMethodInputs[inputKey]
+      
+      if (!inputValue) {
+        this.$q.notify({
+          type: 'warning',
+          message: 'Please enter a value'
+        })
+        return
+      }
+
+      this.setCapabilityState(stateKey, { loading: true })
+
+      // Create method object with value
+      const method = JSON.stringify([{ method: capability, value: inputValue }])
+
+      try {
+        // Create DVM request event (kind 5107)
+        const event = {
+          kind: 5107,
+          content: "",
+          tags: [
+            ['i',  method, 'text'],
+            ['output', 'text/plain'],
+            ['relays', ...this.relays],
+            ['p', device.pubkey]
+          ],
+          created_at: Math.floor(Date.now() / 1000),
+          pubkey: this.userPubkey
+        }
+        
+        // Sign and publish the event
+        const signedEvent = await window.nostr.signEvent(event)
+        
+        // Publish using SimplePool
+        await this.pool.publish(this.relays, signedEvent)
+        console.log('Published DVM set request for capability:', capability, 'with value:', inputValue)
+        
+        // Listen for DVM response
+        this.listenForDVMResponse(device, capability, signedEvent.id)
+        
+      } catch (error) {
+        console.error('Failed to execute set capability:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to execute ' + capability
+        })
+        this.setCapabilityState(stateKey, { loading: false })
+      }
+    },
+
     // Listen for DVM response
     listenForDVMResponse(device, capability, requestId) {
       const stateKey = `${device.pubkey}:${capability}`
@@ -257,17 +320,19 @@ window.app = Vue.createApp({
                 })
               } else {
                 // Display response content
+                this.invoiceDialog.show = false
                 this.setCapabilityState(stateKey, { 
                   loading: false, 
                   result: event.content || 'Success' 
                 })
                 
-                if (event.content) {
-                  this.$q.notify({
-                    type: 'positive',
-                    message: `${capability}: ${event.content}`
-                  })
-                }
+                // Optional: Still show notification for important responses
+                // if (event.content) {
+                //   this.$q.notify({
+                //     type: 'positive',
+                //     message: `${capability}: ${event.content}`
+                //   })
+                // }
               }
             } catch (error) {
               console.error('Error processing DVM response:', error)
@@ -329,6 +394,7 @@ window.app = Vue.createApp({
       const state = this.capabilityStates.get(`${pubkey}:${capability}`)
       return state?.result || null
     },
+
 
     // Refresh devices
     async refreshDevices() {

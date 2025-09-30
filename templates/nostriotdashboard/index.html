@@ -105,20 +105,59 @@
                 <p class="text-caption q-mb-md">${device.about}</p>
                 
                 <div class="q-gutter-xs">
-                  <q-btn
-                    v-for="capability in device.capabilities"
-                    :key="capability"
-                    :label="capability"
-                    size="sm"
-                    color="primary"
-                    outline
-                    @click="executeCapability(device, capability)"
-                    :loading="isCapabilityLoading(device.pubkey, capability)"
-                  >
-                    <span v-if="getCapabilityResult(device.pubkey, capability)" class="q-ml-sm">
-                      ✓
-                    </span>
-                  </q-btn>
+                  <div v-for="capability in device.capabilities" :key="capability" class="full-width">
+                    
+                    <!-- Get methods (simple button) -->
+                    <q-btn
+                      v-if="!isSetMethod(capability)"
+                      :label="capability"
+                      size="sm"
+                      color="primary"
+                      outline
+                      @click="executeCapability(device, capability)"
+                      :loading="isCapabilityLoading(device.pubkey, capability)"
+                      class="full-width text-left"
+                    >
+                      <div class="column full-width">
+                        <div class="text-weight-medium">${capability}</div>
+                        <div 
+                          v-if="getCapabilityResult(device.pubkey, capability)" 
+                          class="text-caption text-grey-6 q-mt-xs"
+                        >
+                          ${getCapabilityResult(device.pubkey, capability)}
+                        </div>
+                      </div>
+                    </q-btn>
+
+                    <!-- Set methods (input + button) -->
+                    <q-card v-else flat bordered class="q-pa-sm">
+                      <div class="text-weight-medium q-mb-sm">${capability}</div>
+                      <div class="row q-gutter-sm items-center">
+                        <q-input
+                          v-model="setMethodInputs[device.pubkey + ':' + capability]"
+                          dense
+                          outlined
+                          placeholder="Enter value"
+                          class="col"
+                        />
+                        <q-btn
+                          label="Set"
+                          size="sm"
+                          color="primary"
+                          @click="executeSetCapability(device, capability)"
+                          :loading="isCapabilityLoading(device.pubkey, capability)"
+                          :disable="!setMethodInputs[device.pubkey + ':' + capability]"
+                        />
+                      </div>
+                      <div 
+                        v-if="getCapabilityResult(device.pubkey, capability)" 
+                        class="text-caption text-grey-6 q-mt-sm"
+                      >
+                        ${getCapabilityResult(device.pubkey, capability)}
+                      </div>
+                    </q-card>
+
+                  </div>
                 </div>
               </q-card-section>
             </q-card>
