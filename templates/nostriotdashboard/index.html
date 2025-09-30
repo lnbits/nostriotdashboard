@@ -25,13 +25,25 @@
         <q-card v-if="!isAuthenticated" class="q-mb-lg">
           <q-card-section>
             <h6 class="q-mt-none">Connect with Nostr</h6>
-            <p class="text-caption">Connect your Nostr browser extension to access IoT devices</p>
-            <q-btn 
-              color="primary" 
-              label="Connect Nostr Extension" 
-              @click="connectNostr"
-              :loading="connecting"
-            />
+            <p class="text-caption">Choose your authentication method</p>
+            
+            <div class="q-gutter-sm">
+              <q-btn 
+                color="primary" 
+                label="Connect Browser Extension" 
+                @click="connectNostr"
+                :loading="connecting && authMethod === 'extension'"
+                icon="extension"
+              />
+              <q-btn 
+                color="secondary" 
+                label="Use Private Key" 
+                @click="showNsecDialog"
+                :loading="connecting && authMethod === 'nsec'"
+                icon="vpn_key"
+                outline
+              />
+            </div>
           </q-card-section>
         </q-card>
 
@@ -202,6 +214,38 @@
             <q-card-actions align="right">
               <q-btn flat label="Cancel" @click="relayDialog.show = false" />
               <q-btn color="primary" label="Add" @click="confirmAddRelay" />
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+
+        <!-- Private Key (nsec) Modal -->
+        <q-dialog v-model="nsecDialog.show">
+          <q-card style="min-width: 400px">
+            <q-card-section>
+              <div class="text-h6">Enter Private Key</div>
+              <p class="text-caption">Enter your Nostr private key (nsec format)</p>
+            </q-card-section>
+            <q-card-section>
+              <q-input 
+                v-model="nsecDialog.privateKey" 
+                label="Private Key (nsec...)"
+                placeholder="nsec1..."
+                type="password"
+                outlined
+              />
+              <div class="text-caption text-warning q-mt-sm">
+                <q-icon name="warning" /> Your private key is only stored locally and never sent to any server
+              </div>
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn flat label="Cancel" @click="nsecDialog.show = false" />
+              <q-btn 
+                color="primary" 
+                label="Connect" 
+                @click="connectWithNsec"
+                :loading="connecting && authMethod === 'nsec'"
+                :disable="!nsecDialog.privateKey"
+              />
             </q-card-actions>
           </q-card>
         </q-dialog>

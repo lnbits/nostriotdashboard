@@ -8,6 +8,8 @@ window.app = Vue.createApp({
       isAuthenticated: false,
       connecting: false,
       userPubkey: null,
+      userPrivateKey: null,
+      authMethod: 'extension', // 'extension' or 'nsec'
       
       // Nostr
       relays: ['wss://relay.nostriot.com'],
@@ -31,6 +33,10 @@ window.app = Vue.createApp({
       relayDialog: {
         show: false,
         url: ''
+      },
+      nsecDialog: {
+        show: false,
+        privateKey: ''
       }
     }
   },
@@ -44,8 +50,20 @@ window.app = Vue.createApp({
     isSetMethod(capability) {
       return capability.toLowerCase().startsWith('set')
     },
-    // Nostr Authentication
+
+    // Helper method to sign events (works with both extension and nsec)
+    async signEvent(event) {
+      if (this.authMethod === 'extension') {
+        return await window.nostr.signEvent(event)
+      } else if (this.authMethod === 'nsec') {
+        return window.NostrTools.finalizeEvent(event, this.userPrivateKey)
+      } else {
+        throw new Error('No authentication method available')
+      }
+    },
+    // Nostr Authentication - Browser Extension
     async connectNostr() {
+      this.authMethod = 'extension'
       this.connecting = true
       try {
         if (!window.nostr) {
@@ -71,6 +89,76 @@ window.app = Vue.createApp({
         this.$q.notify({
           type: 'negative',
           message: 'Failed to connect to Nostr: ' + error.message
+        })
+      }
+      this.connecting = false
+    },
+
+    // Show nsec dialog
+    showNsecDialog() {
+      this.nsecDialog.privateKey = ''
+      this.nsecDialog.show = true
+    },
+
+    // Nostr Authentication - Private Key
+    async connectWithNsec() {
+      this.authMethod = 'nsec'
+      this.connecting = true
+      try {
+        let privateKey = this.nsecDialog.privateKey.trim()
+        
+        console.log('Input private key:', privateKey.substring(0, 10) + '...')
+        
+        // Handle nsec format
+        if (privateKey.startsWith('nsec1')) {
+          try {
+            const decoded = window.NostrTools.nip19.decode(privateKey)
+            privateKey = decoded.data
+            console.log('Decoded from nsec format')
+          } catch (decodeError) {
+            console.error('Failed to decode nsec:', decodeError)
+            throw new Error('Invalid nsec format')
+          }
+        }
+        
+        // Convert to hex string if it's a Uint8Array
+        if (privateKey instanceof Uint8Array) {
+          privateKey = Array.from(privateKey, byte => byte.toString(16).padStart(2, '0')).join('')
+        }
+        
+        console.log('Final private key format:', typeof privateKey, privateKey.length)
+        
+        // Validate private key format (64 hex characters)
+        if (typeof privateKey !== 'string' || !/^[a-fA-F0-9]{64}$/.test(privateKey)) {
+          throw new Error(`Invalid private key format: expected 64 hex chars, got ${privateKey.length} chars`)
+        }
+        
+        // Store private key and generate public key
+        this.userPrivateKey = privateKey
+        this.userPubkey = window.NostrTools.getPublicKey(privateKey)
+        this.isAuthenticated = true
+        
+        console.log('Generated public key:', this.userPubkey)
+        
+        // Close dialog
+        this.nsecDialog.show = false
+        
+        // Initialize SimplePool
+        this.pool = new window.NostrTools.SimplePool()
+        
+        // Fetch follow list and devices
+        await this.fetchFollowList()
+        await this.discoverIoTDevices()
+        
+        this.$q.notify({
+          type: 'positive',
+          message: 'Connected with private key successfully'
+        })
+      } catch (error) {
+        console.error('Private key connection failed:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to connect: ' + error.message
         })
       }
       this.connecting = false
@@ -217,7 +305,7 @@ window.app = Vue.createApp({
         }
         
         // Sign and publish the event
-        const signedEvent = await window.nostr.signEvent(event)
+        const signedEvent = await this.signEvent(event)
         
         // Publish using SimplePool
         await this.pool.publish(this.relays, signedEvent)
@@ -271,7 +359,7 @@ window.app = Vue.createApp({
         }
         
         // Sign and publish the event
-        const signedEvent = await window.nostr.signEvent(event)
+        const signedEvent = await this.signEvent(event)
         
         // Publish using SimplePool
         await this.pool.publish(this.relays, signedEvent)
