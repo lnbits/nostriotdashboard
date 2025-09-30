@@ -43,7 +43,8 @@ window.app = Vue.createApp({
 
   methods: {
     getReadableCapability(capability) {
-      return capability.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
+      // insert a space after 'get', 'set', or 'toggle' if followed by uppercase letter
+      return capability.replace(/^(get|set|toggle)(?=[A-Z])/i, '$1 ')
     },
 
     // Check if capability is a set method
