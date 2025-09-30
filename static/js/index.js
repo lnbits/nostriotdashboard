@@ -24,7 +24,8 @@ window.app = Vue.createApp({
       // Modals
       invoiceDialog: {
         show: false,
-        qrCode: ''
+        bolt11: '',
+        amount: ''
       },
       relayDialog: {
         show: false,
@@ -241,18 +242,18 @@ window.app = Vue.createApp({
         // Set up subscription
         const sub = this.pool.subscribe(this.relays, filter, {
           onevent: async (event) => {
-            // Stop subscription
-            sub.close()
             
             try {
-              // Check if response contains bolt11 invoice
-              const bolt11Tag = event.tags.find(tag => tag[0] === 'bolt11')
-              if (bolt11Tag) {
-                // Display invoice QR code
-                await this.showInvoiceQR(bolt11Tag[1])
+              console.log('Received DVM response event:', event)
+              
+              // Check if response contains bolt11 invoice in amount tag (for kind 6107)
+              const amountTag = event.tags.find(tag => tag[0] === 'amount')
+              if (amountTag && amountTag[2]) {
+                // Display invoice QR code (bolt11 is in the 3rd element)
+                this.showInvoiceQR(amountTag[2], amountTag[1])
                 this.setCapabilityState(stateKey, { 
                   loading: false, 
-                  result: 'Payment required' 
+                  result: `Payment required: ${amountTag[1]} sats` 
                 })
               } else {
                 // Display response content
@@ -297,14 +298,14 @@ window.app = Vue.createApp({
     },
 
     // Show invoice QR code
-    async showInvoiceQR(bolt11) {
+    showInvoiceQR(bolt11, amount) {
       try {
-        // Generate QR code for bolt11 invoice
-        const qrCode = await QRCode.toDataURL(bolt11)
-        this.invoiceDialog.qrCode = qrCode
+        this.invoiceDialog.bolt11 = bolt11
+        this.invoiceDialog.amount = amount
         this.invoiceDialog.show = true
+        console.log('Showing invoice QR for:', bolt11, 'amount:', amount)
       } catch (error) {
-        console.error('Failed to generate QR code:', error)
+        console.error('Failed to display invoice QR code:', error)
         this.$q.notify({
           type: 'negative',
           message: 'Failed to display invoice QR code'

@@ -5,7 +5,6 @@
 {% extends "base.html" %} {% from "macros.jinja" import window_vars with context
 %} {% block scripts %} {{ window_vars(user) }}
 <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
-<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="{{ static_url_for('nostriotdashboard/static', path='js/index.js') }}"></script>
 {% endblock %} {% block page %}
 
@@ -128,17 +127,19 @@
 
         <!-- Invoice Modal -->
         <q-dialog v-model="invoiceDialog.show">
-          <q-card style="min-width: 300px">
+          <q-card style="min-width: 350px">
             <q-card-section>
               <div class="text-h6">Payment Required</div>
+              <p class="text-caption">Amount: ${invoiceDialog.amount} sats</p>
             </q-card-section>
             <q-card-section class="text-center">
-              <q-img 
-                :src="invoiceDialog.qrCode" 
-                style="max-width: 300px"
-                class="q-mb-md"
-              />
-              <p class="text-caption">Scan QR code to pay</p>
+              <lnbits-qrcode
+                :value="'lightning:' + invoiceDialog.bolt11"
+                :href="'lightning:' + invoiceDialog.bolt11"
+                :max-width="300"
+                class="rounded-borders"
+              ></lnbits-qrcode>
+              <p class="text-caption q-mt-md">Scan QR code to pay</p>
             </q-card-section>
             <q-card-actions align="right">
               <q-btn flat label="Close" @click="invoiceDialog.show = false" />
