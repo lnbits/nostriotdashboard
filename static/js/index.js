@@ -10,7 +10,7 @@ window.app = Vue.createApp({
       userPubkey: null,
       
       // Nostr
-      relays: ['wss://relay.nostriot.com', 'wss://relay.damus.io', 'wss://nostr-pub.wellorder.net'],
+      relays: ['wss://relay.damus.io'],
       pool: null,
       
       // IoT Devices
