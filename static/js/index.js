@@ -550,19 +550,23 @@ window.app = Vue.createApp({
                 return
               }
               
-              responseReceived = true
-              clearTimeout(timeoutId)
-              
               // Check if response contains bolt11 invoice in amount tag (for kind 6107)
               const amountTag = event.tags.find(tag => tag[0] === 'amount')
               if (amountTag && amountTag[2]) {
-                // Display invoice QR code (bolt11 is in the 3rd element)
+                // Payment required - keep subscription open for actual response after payment
+                console.log('Payment required, keeping subscription open for final response')
                 this.showInvoiceQR(amountTag[2], amountTag[1])
                 this.setCapabilityState(stateKey, { 
-                  loading: false, 
+                  loading: true, // Keep loading state since we're waiting for final response
                   result: `Payment required: ${amountTag[1]} sats` 
                 })
+                // DO NOT set responseReceived = true or close subscription
+                // DO NOT clear timeout - we still need to wait for final response
               } else {
+                // Final response received - close subscription
+                responseReceived = true
+                clearTimeout(timeoutId)
+                
                 // Display response content
                 this.invoiceDialog.show = false
                 this.setCapabilityState(stateKey, { 
@@ -577,10 +581,10 @@ window.app = Vue.createApp({
                 //     message: `${capability}: ${event.content}`
                 //   })
                 // }
+                
+                // Close subscription after successful processing
+                setTimeout(() => sub.close(), 1000)
               }
-              
-              // Close subscription after successful processing
-              setTimeout(() => sub.close(), 1000)
               
             } catch (error) {
               console.error('Error processing DVM response:', error)
