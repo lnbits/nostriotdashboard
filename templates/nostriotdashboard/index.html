@@ -19,6 +19,16 @@
             <h4 class="q-mt-none q-mb-md">Nostr IoT Dashboard</h4>
             <p class="text-caption">Interact with Nostr IoT devices using DVM protocol</p>
           </div>
+          <div v-if="isAuthenticated" class="col-auto">
+            <q-btn 
+              color="negative" 
+              label="Logout" 
+              @click="logout"
+              icon="logout"
+              outline
+              size="sm"
+            />
+          </div>
         </div>
 
         <!-- Authentication Section -->

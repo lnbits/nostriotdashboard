@@ -62,6 +62,131 @@ window.app = Vue.createApp({
         throw new Error('No authentication method available')
       }
     },
+
+    // Save authentication state to localStorage
+    saveAuthState() {
+      const authState = {
+        method: this.authMethod,
+        pubkey: this.userPubkey,
+        timestamp: Date.now()
+      }
+      
+      // Only save private key for nsec method
+      if (this.authMethod === 'nsec' && this.userPrivateKey) {
+        authState.privateKey = this.userPrivateKey
+      }
+      
+      localStorage.setItem('nostriot_auth', JSON.stringify(authState))
+      console.log('Saved auth state:', authState.method)
+    },
+
+    // Load authentication state from localStorage
+    loadAuthState() {
+      try {
+        const stored = localStorage.getItem('nostriot_auth')
+        if (!stored) return null
+        
+        const authState = JSON.parse(stored)
+        
+        // Check if auth is older than 30 days
+        if (Date.now() - authState.timestamp > 30 * 24 * 60 * 60 * 1000) {
+          this.clearAuthState()
+          return null
+        }
+        
+        return authState
+      } catch (error) {
+        console.error('Failed to load auth state:', error)
+        this.clearAuthState()
+        return null
+      }
+    },
+
+    // Clear authentication state
+    clearAuthState() {
+      localStorage.removeItem('nostriot_auth')
+      this.authMethod = null
+      this.userPubkey = null
+      this.userPrivateKey = null
+      this.isAuthenticated = false
+      this.iotDevices = []
+      this.followList = []
+      if (this.pool) {
+        this.pool.close()
+        this.pool = null
+      }
+      console.log('Cleared auth state')
+    },
+
+    // Auto-login on page load
+    async autoLogin() {
+      const authState = this.loadAuthState()
+      if (!authState) return
+      
+      console.log('Attempting auto-login with method:', authState.method)
+      
+      try {
+        if (authState.method === 'extension') {
+          // Check if browser extension is still available
+          if (!window.nostr) {
+            console.log('Nostr extension no longer available')
+            this.clearAuthState()
+            return
+          }
+          
+          // Verify the extension still has the same pubkey
+          const currentPubkey = await window.nostr.getPublicKey()
+          if (currentPubkey !== authState.pubkey) {
+            console.log('Extension pubkey changed, clearing auth')
+            this.clearAuthState()
+            return
+          }
+          
+          this.authMethod = 'extension'
+          this.userPubkey = authState.pubkey
+          this.isAuthenticated = true
+          
+        } else if (authState.method === 'nsec') {
+          if (!authState.privateKey) {
+            console.log('No private key in stored auth')
+            this.clearAuthState()
+            return
+          }
+          
+          this.authMethod = 'nsec'
+          this.userPrivateKey = authState.privateKey
+          this.userPubkey = authState.pubkey
+          this.isAuthenticated = true
+        }
+        
+        // Initialize SimplePool and fetch data
+        this.pool = new window.NostrTools.SimplePool()
+        await this.fetchFollowList()
+        await this.discoverIoTDevices()
+        
+        this.$q.notify({
+          type: 'positive',
+          message: `Auto-logged in with ${authState.method}`
+        })
+        
+      } catch (error) {
+        console.error('Auto-login failed:', error)
+        this.clearAuthState()
+        this.$q.notify({
+          type: 'warning',
+          message: 'Auto-login failed, please reconnect'
+        })
+      }
+    },
+
+    // Logout function
+    logout() {
+      this.clearAuthState()
+      this.$q.notify({
+        type: 'info',
+        message: 'Logged out successfully'
+      })
+    },
     // Nostr Authentication - Browser Extension
     async connectNostr() {
       this.authMethod = 'extension'
@@ -76,6 +201,9 @@ window.app = Vue.createApp({
         
         // Initialize SimplePool
         this.pool = new window.NostrTools.SimplePool()
+        
+        // Save auth state
+        this.saveAuthState()
         
         // Fetch follow list and devices
         await this.fetchFollowList()
@@ -146,6 +274,9 @@ window.app = Vue.createApp({
         
         // Initialize SimplePool
         this.pool = new window.NostrTools.SimplePool()
+        
+        // Save auth state
+        this.saveAuthState()
         
         // Fetch follow list and devices
         await this.fetchFollowList()
@@ -535,5 +666,8 @@ window.app = Vue.createApp({
     console.log('SimplePool available:', typeof window.NostrTools?.SimplePool !== 'undefined')
     console.log('QRCode available:', typeof window.QRCode !== 'undefined')
     console.log('Nostr extension available:', typeof window.nostr !== 'undefined')
+    
+    // Attempt auto-login
+    await this.autoLogin()
   }
 })
