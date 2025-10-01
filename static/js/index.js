@@ -35,8 +35,10 @@ window.app = Vue.createApp({
       invoiceDialog: {
         show: false,
         bolt11: '',
-        amount: ''
+        amount: '',
+        paymentLoading: false
       },
+      selectedWallet: null,
       relayDialog: {
         show: false,
         url: ''
@@ -683,7 +685,14 @@ window.app = Vue.createApp({
       try {
         this.invoiceDialog.bolt11 = bolt11
         this.invoiceDialog.amount = amount
+        this.invoiceDialog.paymentLoading = false
         this.invoiceDialog.show = true
+        
+        // Set default wallet if none selected and wallets are available
+        if (!this.selectedWallet && this.g && this.g.user && this.g.user.wallets && this.g.user.wallets.length > 0) {
+          this.selectedWallet = this.g.user.wallets[0].id
+        }
+        
         console.log('Showing invoice QR for:', bolt11, 'amount:', amount)
       } catch (error) {
         console.error('Failed to display invoice QR code:', error)
@@ -691,6 +700,77 @@ window.app = Vue.createApp({
           type: 'negative',
           message: 'Failed to display invoice QR code'
         })
+      }
+    },
+
+    // Pay invoice with LNbits wallet
+    async payWithLNbits() {
+      if (!this.selectedWallet) {
+        this.$q.notify({
+          type: 'warning',
+          message: 'Please select a wallet first'
+        })
+        return
+      }
+      
+      this.invoiceDialog.paymentLoading = true
+      
+      try {
+        // Find the selected wallet object to get the admin key
+        const wallet = this.g.user.wallets.find(w => w.id === this.selectedWallet)
+        if (!wallet) {
+          throw new Error('Selected wallet not found')
+        }
+        
+        const response = await LNbits.api.request(
+          'POST',
+          '/nostriotdashboard/api/v1/pay-invoice',
+          wallet.adminkey, // Use the wallet's admin key for authentication
+          {
+            bolt11: this.invoiceDialog.bolt11,
+            amount: parseInt(this.invoiceDialog.amount)
+          }
+        )
+
+        if (response.data.success) {
+          this.$q.notify({
+            type: 'positive',
+            message: 'Payment successful!',
+            timeout: 3000
+          })
+          
+          // Close the invoice dialog
+          this.invoiceDialog.show = false
+          
+          // The DVM response should come automatically after payment
+          console.log('Payment completed:', response.data.payment_hash)
+          
+        } else {
+          throw new Error(response.data.error || 'Payment failed')
+        }
+        
+      } catch (error) {
+        console.error('Payment failed:', error)
+        
+        // Extract error message from API response
+        let errorMessage = 'Payment failed'
+        
+        if (error.response && error.response.data && error.response.data.detail) {
+          // Handle 400 errors with detail message
+          errorMessage = error.response.data.detail
+        } else if (error.message) {
+          errorMessage = `Payment failed: ${error.message}`
+        } else if (typeof error === 'string') {
+          errorMessage = `Payment failed: ${error}`
+        }
+        
+        this.$q.notify({
+          type: 'negative',
+          message: errorMessage,
+          timeout: 5000
+        })
+      } finally {
+        this.invoiceDialog.paymentLoading = false
       }
     },
 

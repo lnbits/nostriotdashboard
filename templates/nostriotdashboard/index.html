@@ -345,20 +345,65 @@
 
         <!-- Invoice Modal -->
         <q-dialog v-model="invoiceDialog.show">
-          <q-card style="min-width: 350px">
+          <q-card style="min-width: 400px">
             <q-card-section>
               <div class="text-h6">Payment Required</div>
               <p class="text-caption">Amount: ${invoiceDialog.amount} sats</p>
             </q-card-section>
-            <q-card-section class="text-center">
+            
+            <!-- Payment Options -->
+            <q-card-section class="q-pt-none">
+              <!-- Wallet Selection -->
+              <div class="q-mb-md">
+                <q-select
+                  v-model="selectedWallet"
+                  :options="g.user.wallets"
+                  option-label="name"
+                  option-value="id"
+                  label="Select wallet"
+                  outlined
+                  dense
+                  emit-value
+                  map-options
+                  class="q-mb-sm"
+                />
+                
+                
+              </div>
+              <q-btn
+                color="primary"
+                icon="account_balance_wallet"
+                label="Pay with selected wallet"
+                @click="payWithLNbits"
+                :loading="invoiceDialog.paymentLoading"
+                :disable="invoiceDialog.paymentLoading || !selectedWallet"
+                class="full-width"
+                size="md"
+              />
+            </q-card-section>
+
+            <!-- Divider -->
+              <div class="row items-center q-mb-md">
+                <div class="col">
+                  <q-separator />
+                </div>
+                <div class="col-auto q-px-md flex flex-column items-center">
+                  <p class="text-caption text-grey-6 q-mb-none">or scan QR code with a lightning wallet</p>
+                </div>
+                <div class="col">
+                  <q-separator />
+                </div>
+              </div>
+            
+            <!-- QR Code Section -->
+            <q-card-section class="text-center q-pt-none">
               <lnbits-qrcode
                 :value="'lightning:' + invoiceDialog.bolt11"
                 :href="'lightning:' + invoiceDialog.bolt11"
-                :max-width="300"
                 class="rounded-borders"
               ></lnbits-qrcode>
-              <p class="text-caption q-mt-md">Scan QR code to pay</p>
             </q-card-section>
+            
             <q-card-actions align="right">
               <q-btn flat label="Close" @click="invoiceDialog.show = false" />
             </q-card-actions>
