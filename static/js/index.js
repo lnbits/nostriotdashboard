@@ -392,15 +392,35 @@ window.app = Vue.createApp({
           since: Math.floor(Date.now() / 1000)
         }
         
+        let responseReceived = false
+        
         // Set up subscription
         const sub = this.pool.subscribe(this.relays, filter, {
           onevent: async (event) => {
-            // Clear timeout and close subscription since we got a response
-            sub.close()
-            clearTimeout(timeoutId)
+            // Only process the first valid response to avoid duplicates
+            if (responseReceived) {
+              console.log('Ignoring duplicate response for request:', requestId)
+              return
+            }
             
             try {
               console.log('Received DVM response event:', event)
+              
+              // Validate event structure
+              if (!event || !event.kind || event.kind !== 6107) {
+                console.warn('Invalid event structure:', event)
+                return
+              }
+              
+              // Verify this response is for our request
+              const eventTag = event.tags.find(tag => tag[0] === 'e' && tag[1] === requestId)
+              if (!eventTag) {
+                console.warn('Response event ID does not match request:', event.id)
+                return
+              }
+              
+              responseReceived = true
+              clearTimeout(timeoutId)
               
               // Check if response contains bolt11 invoice in amount tag (for kind 6107)
               const amountTag = event.tags.find(tag => tag[0] === 'amount')
@@ -427,27 +447,40 @@ window.app = Vue.createApp({
                 //   })
                 // }
               }
+              
+              // Close subscription after successful processing
+              setTimeout(() => sub.close(), 1000)
+              
             } catch (error) {
               console.error('Error processing DVM response:', error)
               this.setCapabilityState(stateKey, { 
                 loading: false, 
                 result: 'Error processing response' 
               })
+              responseReceived = true
+              clearTimeout(timeoutId)
+              setTimeout(() => sub.close(), 1000)
             }
           },
           oneose: () => {
             console.log('End of stored events for DVM response')
+          },
+          onclose: (reason) => {
+            console.log('DVM response subscription closed:', reason)
           }
         })
         
-        // Timeout after 30 seconds
+        // Extended timeout to 60 seconds for IoT operations
         const timeoutId = setTimeout(() => {
-          sub.close()
-          this.setCapabilityState(stateKey, { 
-            loading: false, 
-            result: 'Timeout - no response' 
-          })
-        }, 30000)
+          if (!responseReceived) {
+            console.warn('Timeout waiting for DVM response:', requestId)
+            sub.close()
+            this.setCapabilityState(stateKey, { 
+              loading: false, 
+              result: 'Timeout - no response' 
+            })
+          }
+        }, 60000)
         
       } catch (error) {
         console.error('Failed to listen for DVM response:', error)
