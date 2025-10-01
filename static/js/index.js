@@ -20,6 +20,13 @@ window.app = Vue.createApp({
       loadingDevices: true,
       followList: [],
       
+      // Explore Service Providers
+      showExploreView: false,
+      serviceProviders: [],
+      loadingProviders: false,
+      followingStates: {}, // Track follow button loading states
+      searchTerm: '',
+      
       // UI State
       capabilityStates: new Map(),
       setMethodInputs: {},
@@ -41,6 +48,25 @@ window.app = Vue.createApp({
     }
   },
 
+  computed: {
+    filteredProviders() {
+      if (!this.searchTerm) {
+        return this.serviceProviders
+      }
+      
+      const term = this.searchTerm.toLowerCase()
+      return this.serviceProviders.filter(provider => 
+        provider.name.toLowerCase().includes(term) ||
+        provider.about.toLowerCase().includes(term) ||
+        provider.capabilities.some(cap => cap.toLowerCase().includes(term))
+      )
+    },
+    
+    exploreButtonLabel() {
+      return this.showExploreView ? 'Show Your Devices' : 'Explore IoT Service Providers'
+    }
+  },
+
   methods: {
     getReadableCapability(capability) {
       // uc first letter
@@ -52,6 +78,33 @@ window.app = Vue.createApp({
     // Check if capability is a set method
     isSetMethod(capability) {
       return capability.toLowerCase().startsWith('set')
+    },
+
+    // Utility methods for explore view
+    formatPubkey(pubkey) {
+      return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8)
+    },
+
+    formatDate(timestamp) {
+      return new Date(timestamp * 1000).toLocaleDateString()
+    },
+
+    isFollowing(pubkey) {
+      console.log('Checking if following:', pubkey, this.followList.includes(pubkey))
+      return this.followList.includes(pubkey)
+    },
+
+    getMoreCapabilitiesLabel(capabilities) {
+      const remaining = capabilities.length - 6
+      return `+${remaining} more`
+    },
+
+    // Toggle explore view
+    toggleExploreView() {
+      this.showExploreView = !this.showExploreView
+      if (this.showExploreView && this.serviceProviders.length === 0) {
+        this.discoverServiceProviders()
+      }
     },
 
     // Helper method to sign events (works with both extension and nsec)
@@ -658,6 +711,153 @@ window.app = Vue.createApp({
       return state?.result || null
     },
 
+
+    // Discover all IoT service providers from the network
+    async discoverServiceProviders() {
+      this.loadingProviders = true
+      try {
+        // Query for all DVM advertisements (kind 31990) from past week
+        const oneWeekAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
+        const filter = {
+          kinds: [31990],
+          since: oneWeekAgo
+        }
+        
+        console.log('Querying for service providers since:', new Date(oneWeekAgo * 1000))
+        const events = await this.pool.querySync(this.relays, filter)
+        console.log('Fetched service provider events:', events.length)
+        
+        // Deduplicate by pubkey (keep most recent per author)
+        const providerMap = new Map()
+        for (const event of events) {
+          // Filter for IoT devices (tag 'k' = '5107')
+          const kTag = event.tags.find(tag => tag[0] === 'k' && tag[1] === '5107')
+          if (kTag) {
+            const existing = providerMap.get(event.pubkey)
+            if (!existing || event.created_at > existing.created_at) {
+              providerMap.set(event.pubkey, event)
+            }
+          }
+        }
+        
+        // Parse providers and sort by most recent
+        this.serviceProviders = []
+        for (const event of providerMap.values()) {
+          const provider = this.parseServiceProvider(event)
+          if (provider) {
+            this.serviceProviders.push(provider)
+          }
+        }
+        
+        // Sort by most recent first
+        this.serviceProviders.sort((a, b) => b.created_at - a.created_at)
+        
+        console.log('Discovered service providers:', this.serviceProviders.length)
+        
+        if (this.serviceProviders.length === 0) {
+          this.$q.notify({
+            type: 'info',
+            message: 'No IoT service providers found in the past week'
+          })
+        }
+      } catch (error) {
+        console.error('Failed to discover service providers:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to discover service providers'
+        })
+      }
+      this.loadingProviders = false
+    },
+
+    // Parse service provider from DVM advertisement
+    parseServiceProvider(event) {
+      try {
+        const content = JSON.parse(event.content)
+        const capabilitiesTag = event.tags.find(tag => tag[0] === 't')
+        const capabilities = capabilitiesTag ? capabilitiesTag.slice(1) : []
+        
+        return {
+          pubkey: event.pubkey,
+          name: content.name || 'Unknown Service',
+          about: content.about || 'No description available',
+          capabilities: capabilities,
+          created_at: event.created_at
+        }
+      } catch (error) {
+        console.error('Failed to parse service provider:', error)
+        return null
+      }
+    },
+
+    // Follow a service provider
+    async followProvider(provider) {
+      if (this.followingStates[provider.pubkey]) return // Already following
+      
+      this.followingStates[provider.pubkey] = true
+      
+      try {
+        // Fetch current follow list
+        const filter = {
+          kinds: [3],
+          authors: [this.userPubkey],
+          limit: 1
+        }
+        
+        const events = await this.pool.querySync(this.relays, filter)
+        let followEvent = null
+        let existingTags = []
+        
+        if (events.length > 0) {
+          followEvent = events[0]
+          existingTags = followEvent.tags.filter(tag => tag[0] === 'p')
+        }
+        
+        // Check if already following
+        if (existingTags.some(tag => tag[1] === provider.pubkey)) {
+          this.$q.notify({
+            type: 'info',
+            message: 'Already following this provider'
+          })
+          this.followList.push(provider.pubkey)
+          return
+        }
+        
+        // Add new provider to follow list
+        const newTags = [...existingTags, ['p', provider.pubkey]]
+        
+        // Create updated follow list event
+        const newFollowEvent = {
+          kind: 3,
+          content: followEvent?.content || '',
+          tags: newTags,
+          created_at: Math.floor(Date.now() / 1000),
+          pubkey: this.userPubkey
+        }
+        
+        // Sign and publish the event
+        const signedEvent = await this.signEvent(newFollowEvent)
+        await this.pool.publish(this.relays, signedEvent)
+        
+        // Update local follow list
+        this.followList.push(provider.pubkey)
+        
+        console.log('Successfully followed provider:', provider.name)
+        this.$q.notify({
+          type: 'positive',
+          message: `Now following ${provider.name}`
+        })
+        
+      } catch (error) {
+        console.error('Failed to follow provider:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to follow provider'
+        })
+      } finally {
+        this.followingStates[provider.pubkey] = false
+      }
+    },
 
     // Refresh devices
     async refreshDevices() {
