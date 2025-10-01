@@ -36,24 +36,26 @@
           <q-card-section>
             <h6 class="q-mt-none">Connect with Nostr</h6>
             <p class="text-caption">Choose your authentication method</p>
-            
-            <div class="q-gutter-sm">
+            <div class=" flex row">
+            <div class="q-mr-md">
               <q-btn 
                 color="primary" 
-                label="Connect Browser Extension" 
+                label="Log in with browser extension" 
                 @click="connectNostr"
                 :loading="connecting && authMethod === 'extension'"
                 icon="extension"
               />
+            </div>
+            <div>
               <q-btn 
                 color="secondary" 
-                label="Use Private Key" 
+                label="Log in with private key" 
                 @click="showNsecDialog"
                 :loading="connecting && authMethod === 'nsec'"
                 icon="vpn_key"
-                outline
               />
-            </div>
+              </div>
+              </div>
           </q-card-section>
         </q-card>
 
@@ -88,7 +90,7 @@
         <!-- IoT Devices -->
         <div v-if="isAuthenticated">
           <div class="row items-center q-mb-md">
-            <h6 class="q-mt-none q-mb-none col">IoT Devices</h6>
+            <h6 class="q-mt-none q-mb-none col">Your IoT Service Providers</h6>
             <q-btn 
               size="sm" 
               color="positive" 
@@ -152,7 +154,7 @@
 
                     <!-- Set methods (input + button) -->
                     <q-card v-else flat bordered class="q-pa-sm">
-                      <div class="text-weight-medium q-mb-sm">${capability}</div>
+                      <div class="text-weight-medium q-mb-sm">${getReadableCapability(capability)}</div>
                       <div class="row q-gutter-sm items-center">
                         <q-input
                           v-model="setMethodInputs[device.pubkey + ':' + capability]"
@@ -243,11 +245,14 @@
                 outlined
               />
               <div class="text-caption text-warning q-mt-sm">
-                <q-icon name="warning" /> Your private key is only stored locally and never sent to any server
+                 Your private key is only stored locally and never sent to any server
               </div>
             </q-card-section>
             <q-card-actions align="right">
+              <div  class="q-mr-sm">
               <q-btn flat label="Cancel" @click="nsecDialog.show = false" />
+              </div>
+              <div>
               <q-btn 
                 color="primary" 
                 label="Connect" 
@@ -255,6 +260,7 @@
                 :loading="connecting && authMethod === 'nsec'"
                 :disable="!nsecDialog.privateKey"
               />
+              </div
             </q-card-actions>
           </q-card>
         </q-dialog>

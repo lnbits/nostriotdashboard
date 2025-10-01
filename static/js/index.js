@@ -17,7 +17,7 @@ window.app = Vue.createApp({
       
       // IoT Devices
       iotDevices: [],
-      loadingDevices: false,
+      loadingDevices: true,
       followList: [],
       
       // UI State
@@ -43,6 +43,8 @@ window.app = Vue.createApp({
 
   methods: {
     getReadableCapability(capability) {
+      // uc first letter
+      capability = capability.charAt(0).toUpperCase() + capability.slice(1)
       // insert a space after 'get', 'set', or 'toggle' if followed by uppercase letter
       return capability.replace(/^(get|set|toggle)(?=[A-Z])/i, '$1 ')
     },
