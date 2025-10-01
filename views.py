@@ -82,7 +82,7 @@ async def manifest(nostriotdashboard_id: str):
         ],
         "start_url": "/nostriotdashboard/" + nostriotdashboard_id,
         "background_color": "#1F2234",
-        "description": "Minimal extension to build on",
+        "description": "A dashboard for Nostr IoT devices",
         "display": "standalone",
         "scope": "/nostriotdashboard/" + nostriotdashboard_id,
         "theme_color": "#1F2234",
