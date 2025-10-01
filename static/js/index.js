@@ -88,7 +88,16 @@ window.app = Vue.createApp({
     },
 
     formatDate(timestamp) {
-      return new Date(timestamp * 1000).toLocaleDateString()
+      // return as time ago
+      const timeDiff = Date.now() / 1000 - timestamp
+      if (Math.floor(timeDiff) == 1) return '1 second ago'
+      if (timeDiff < 60) return `${Math.floor(timeDiff)} seconds ago`
+      if(Math.floor(timeDiff / 60) == 1) return '1 minute ago'
+      if (timeDiff < 3600) return `${Math.floor(timeDiff / 60)} minutes ago`
+      if(Math.floor(timeDiff / 3600) == 1) return '1 hour ago'
+      if (timeDiff < 86400) return `${Math.floor(timeDiff / 3600)} hours ago`
+      if (Math.floor(timeDiff / 86400) == 1) return '1 day ago'
+      return `${Math.floor(timeDiff / 86400)} days ago`
     },
 
     isFollowing(pubkey) {
