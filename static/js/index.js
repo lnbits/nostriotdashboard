@@ -396,6 +396,7 @@ window.app = Vue.createApp({
         const sub = this.pool.subscribe(this.relays, filter, {
           onevent: async (event) => {
             // Clear timeout and close subscription since we got a response
+            sub.close()
             clearTimeout(timeoutId)
             
             try {
