@@ -277,13 +277,14 @@
                       <div class="col-auto">
                         <div v-if="isFollowing(provider.pubkey)">
                         <q-btn
-                          color="positive"
-                          icon="check"
-                          label="Following"
+                          color="negative"
+                          icon="person_remove"
+                          label="Unfollow"
                           size="sm"
-                          flat
+                          @click="unfollowProvider(provider)"
+                          :loading="followingStates[provider.pubkey]"
+                          outline
                           dense
-                          disable
                         />
                         </div>
                         <div v-else>

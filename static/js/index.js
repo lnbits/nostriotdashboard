@@ -944,6 +944,76 @@ window.app = Vue.createApp({
       }
     },
 
+    // Unfollow a service provider
+    async unfollowProvider(provider) {
+      if (this.followingStates[provider.pubkey]) return // Already processing
+
+      this.followingStates[provider.pubkey] = true
+
+      try {
+        // Fetch current follow list
+        const filter = {
+          kinds: [3],
+          authors: [this.userPubkey],
+          limit: 1
+        }
+
+        const events = await this.pool.querySync(this.relays, filter)
+        let followEvent = null
+        let existingTags = []
+
+        if (events.length > 0) {
+          followEvent = events[0]
+          existingTags = followEvent.tags.filter(tag => tag[0] === 'p')
+        }
+
+        // Check if not following
+        if (!existingTags.some(tag => tag[1] === provider.pubkey)) {
+          this.$q.notify({
+            type: 'info',
+            message: 'Not following this provider'
+          })
+          // Remove from local follow list if it exists
+          this.followList = this.followList.filter(pubkey => pubkey !== provider.pubkey)
+          return
+        }
+
+        // Remove provider from follow list
+        const newTags = existingTags.filter(tag => tag[1] !== provider.pubkey)
+
+        // Create updated follow list event
+        const newFollowEvent = {
+          kind: 3,
+          content: followEvent?.content || '',
+          tags: newTags,
+          created_at: Math.floor(Date.now() / 1000),
+          pubkey: this.userPubkey
+        }
+
+        // Sign and publish the event
+        const signedEvent = await this.signEvent(newFollowEvent)
+        await this.pool.publish(this.relays, signedEvent)
+
+        // Update local follow list
+        this.followList = this.followList.filter(pubkey => pubkey !== provider.pubkey)
+
+        console.log('Successfully unfollowed provider:', provider.name)
+        this.$q.notify({
+          type: 'positive',
+          message: `Unfollowed ${provider.name}`
+        })
+
+      } catch (error) {
+        console.error('Failed to unfollow provider:', error)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Failed to unfollow provider'
+        })
+      } finally {
+        this.followingStates[provider.pubkey] = false
+      }
+    },
+
     // Refresh devices
     async refreshDevices() {
       await this.fetchFollowList()
