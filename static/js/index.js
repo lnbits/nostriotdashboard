@@ -671,17 +671,15 @@ window.app = Vue.createApp({
           }
         })
         
-        // Extended timeout to 60 seconds for IoT operations
         const timeoutId = setTimeout(() => {
           if (!responseReceived) {
             console.warn('Timeout waiting for DVM response:', requestId)
-            sub.close()
             this.setCapabilityState(stateKey, { 
               loading: false, 
-              result: 'Timeout - no response' 
+              result: null 
             })
           }
-        }, 60000)
+        }, 10000)
         
       } catch (error) {
         console.error('Failed to listen for DVM response:', error)
