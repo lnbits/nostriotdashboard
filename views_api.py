@@ -47,7 +47,7 @@ async def api_pay_invoice(
             payment_request=data.bolt11,
         )
         logger.debug(f"Payment result: {payment_result}")
-        if payment_result.preimage:
+        if payment_result.status == 'success':
             return {
                 "success": True,
                 "payment_hash": payment_result.payment_hash,
