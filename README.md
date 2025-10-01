@@ -1,44 +1,40 @@
-`The README.md typically serves as a guide for using the extension.`
+# Nostr IoT Dashboard - An [LNbits](https://github.com/lnbits/lnbits) Extension
 
-# NostriotDashboard - An [LNbits](https://github.com/lnbits/lnbits) Extension
+## Control IoT Devices Through Nostr Protocol
 
-## A Starter Template for Your Own Extension
+The Nostr IoT Dashboard extension provides a user interface for discovering and controlling IoT devices that implement the Nostr Data Vending Machine (DVM) protocol.
 
-Ready to start hacking? Once you've forked this extension, you can incorporate functions from other extensions as needed.
+## Features
 
-### How to Use This Template
+- **Device Discovery**: Automatically finds IoT devices from your Nostr follow list that advertise DVM capabilities
+- **Real-time Control**: Execute device capabilities through Nostr DVM requests and receive responses
+- **Lightning Integration**: Seamless payment handling for premium IoT functions with QR code invoice display  
+- **Multi-relay Support**: Connects to multiple Nostr relays for improved reliability
+- **Flexible Authentication**: Supports both Nostr browser extensions and manual private key input
 
-> [!IMPORTANT] the sequence of steps is very important so as not to run into issues!
+## How It Works
 
-> [!NOTE] You may want to modify your models.py/migration.py before installing the extension on your lnbits server (between steps
+1. **Connect to Nostr**: Authenticate using a Nostr browser extension or private key
+2. **Discover Devices**: The extension scans your follow list for IoT devices advertising DVM capabilities (kind 31990 events)
+3. **Control Devices**: Click device capabilities to send DVM requests (kind 5107) and receive responses (kind 6107)
+4. **Handle Payments**: For premium functions, pay Lightning invoices displayed as QR codes
 
-> This guide assumes you're using this extension as a base for a new one, and have installed LNbits using <https://github.com/lnbits/lnbits/blob/main/docs/guide/installation.md#option-1-recommended-poetry>.
+## Supported Device Types
 
-1. Fork this extension to your Github repo with the name you want, e.g., `yourextensionname` -> <https://github.com/yourgithubusername/yourextensionname> (do not include hyphens as they can cause issues!)
+This extension works with any IoT device that implements the Nostr DVM protocol, including:
+- Smart home devices (lights, switches, sensors)
+- Environmental monitors  
+- Industrial IoT equipment
+- Custom Nostr-enabled hardware
 
-1. Clone the Repository to your local computer. `git clone git@github.com/yourgithubuersname/yourextensionname`
+## Technical Details
 
-1. `cd` into the folder `yourextensionname` and delete the `.git` folder with `rm -rf .git`
+- **Nostr Event Types**: Handles kinds 3 (contact lists), 31990 (DVM advertisements), 5107 (DVM requests), and 6107 (DVM responses)
+- **WebSocket Connections**: Uses nostr-tools for client side Nostr stuff
 
-1. run `./updateExtensionName.sh nostriotdashboard:<yourextensionname> nostriotDashboard:<yourExtensionName> NostriotDashboard:<YourExtensionName>` (to replace all variations)
+## Getting Started
 
-1. edit `./manifest.json` and replace the organization `lnbits` with `<yourgithubusernaame>`
-
-1. (Optional) Modify your models.py/migration.py file to create your own database tables, or just play with the already existing ones
-
-1. Re-initialize a git repo with `git init && git add . && git commit -m "initial commit"`
-
-1. Push to your github repo
-
-1. [!IMPORTANT] **you must create a release** _in your github repo_ in order for it to show up in your lnbits extensions!
-
-1. Start up your lnbits server and go to the Settings -> EXTENSIONS and add your manifest to the extension sources. It should be `https://raw.githubusercontent.com/<yourgithubusernaame>/<yourextensionname>/main/manifest.json` (going to this link should show your updated manifest) and **save**. ![Extension Sources](https://i.imgur.com/MUGwAU3.png)
-1. Great! Now if you go to the **Extensions** and go to the **ALL** tab, you should see your extension available for installing! (note that Github has an API rate limit, and you may want to include an API key generated from your github account in the `.env` file)
-
-1. Remove the installed extension from `lnbits/lnbits/extensions`.
-
-1. Create a symbolic link using `ln -s /home/ben/Projects/<name of your extension> /home/ben/Projects/lnbits/lnbits/extensions`.
-
-1. Restart your LNbits installation. You can now modify your extension and the changes will appear on your LNbits instance (stop & restart your lnbits for full initialization of all files if needed, e.g., for migration to take effect). You can also `git push` changes to your new repo and create a release _in your github repo_ if you want to install it from a fresh lnbits!
-
-1. IMPORTANT: If you want your extension to be added to the official LNbits manifest, please follow the guidelines here: <https://github.com/lnbits/lnbits-extensions#important>
+1. Install the extension in your LNbits instance
+2. Follow IoT device accounts on Nostr that provide DVM services
+3. Open the Nostr IoT Dashboard and connect your Nostr identity
+4. Discovered devices will appear automatically - click capabilities to control them

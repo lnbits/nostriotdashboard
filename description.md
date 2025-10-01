@@ -1,10 +1,13 @@
-NostriotDashboard can be used as a template for building new extensions, it includes a bunch of functions that can be edited/deleted as you need them.
+Nostr IoT Dashboard provides a user interface for discovering and controlling IoT devices through the Nostr protocol using Data Vending Machine (DVM) standards.
 
-This is a longform description that will be used in the advanced description when users click on the "more" button on the extension cards.
+This extension enables users to interact with IoT devices that advertise their capabilities on Nostr relays, supporting Lightning Network payments for paid device functions.
 
-Adding some bullets is nice covering:
+Key features include:
 
-- Functionality
-- Use cases
+- **Device Discovery**: Automatically finds IoT devices from your Nostr follow list that advertise DVM capabilities (kind 31990 events)
+- **Real-time Control**: Execute device capabilities through Nostr DVM requests (kind 5107) and receive responses (kind 6107)
+- **Lightning Integration**: Seamless payment handling for paid IoT functions with QR code invoice display
+- **Multi-relay Support**: Connects to multiple Nostr relays for improved reliability and device discovery
+- **User Authentication**: Supports both Nostr browser extensions and manual private key input for device control
 
-...and some other text about just how great this etension is.
+Perfect for managing smart home devices, sensors, and other IoT equipment that implement the Nostr DVM protocol for decentralized device communication.
