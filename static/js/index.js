@@ -14,6 +14,8 @@ window.app = Vue.createApp({
       // Nostr
       relays: ['wss://relay.nostriot.com'],
       pool: null,
+      globalDVMSubscription: null,
+      pendingRequests: new Map(), // Track pending DVM requests
 
       // IoT Devices
       iotDevices: [],
@@ -175,10 +177,15 @@ window.app = Vue.createApp({
       this.isAuthenticated = false
       this.iotDevices = []
       this.followList = []
+      if (this.globalDVMSubscription) {
+        this.globalDVMSubscription.close()
+        this.globalDVMSubscription = null
+      }
       if (this.pool) {
         this.pool.close()
         this.pool = null
       }
+      this.pendingRequests.clear()
       console.log('Cleared auth state')
     },
 
@@ -225,6 +232,7 @@ window.app = Vue.createApp({
 
         // Initialize SimplePool and fetch data
         this.pool = new window.NostrTools.SimplePool()
+        this.setupGlobalDVMSubscription()
         await this.fetchFollowList()
         await this.discoverIoTDevices()
 
@@ -265,6 +273,7 @@ window.app = Vue.createApp({
 
         // Initialize SimplePool
         this.pool = new window.NostrTools.SimplePool()
+        this.setupGlobalDVMSubscription()
 
         // Save auth state
         this.saveAuthState()
@@ -338,6 +347,7 @@ window.app = Vue.createApp({
 
         // Initialize SimplePool
         this.pool = new window.NostrTools.SimplePool()
+        this.setupGlobalDVMSubscription()
 
         // Save auth state
         this.saveAuthState()
@@ -507,8 +517,25 @@ window.app = Vue.createApp({
         await this.pool.publish(this.relays, signedEvent)
         console.log('Published DVM request for capability:', capability)
 
-        // Listen for DVM response
-        this.listenForDVMResponse(device, capability, signedEvent.id)
+        // Register request for global subscription handling
+        this.pendingRequests.set(signedEvent.id, {
+          device,
+          capability,
+          stateKey,
+          timestamp: Date.now()
+        })
+
+        // Set up timeout for request cleanup
+        setTimeout(() => {
+          if (this.pendingRequests.has(signedEvent.id)) {
+            console.warn('Request timeout for capability:', capability)
+            this.pendingRequests.delete(signedEvent.id)
+            this.setCapabilityState(stateKey, {
+              loading: false,
+              result: 'Request timeout'
+            })
+          }
+        }, 30000) // 30 second timeout
 
       } catch (error) {
         console.error('Failed to execute capability:', error)
@@ -561,8 +588,25 @@ window.app = Vue.createApp({
         await this.pool.publish(this.relays, signedEvent)
         console.log('Published DVM set request for capability:', capability, 'with value:', inputValue)
 
-        // Listen for DVM response
-        this.listenForDVMResponse(device, capability, signedEvent.id)
+        // Register request for global subscription handling
+        this.pendingRequests.set(signedEvent.id, {
+          device,
+          capability,
+          stateKey,
+          timestamp: Date.now()
+        })
+
+        // Set up timeout for request cleanup
+        setTimeout(() => {
+          if (this.pendingRequests.has(signedEvent.id)) {
+            console.warn('Request timeout for capability:', capability)
+            this.pendingRequests.delete(signedEvent.id)
+            this.setCapabilityState(stateKey, {
+              loading: false,
+              result: 'Request timeout'
+            })
+          }
+        }, 30000) // 30 second timeout
 
       } catch (error) {
         console.error('Failed to execute set capability:', error)
@@ -574,116 +618,126 @@ window.app = Vue.createApp({
       }
     },
 
-    // Listen for DVM response
-    listenForDVMResponse(device, capability, requestId) {
-      const stateKey = `${device.pubkey}:${capability}`
+    // Setup global DVM subscription for all 6107 responses
+    setupGlobalDVMSubscription() {
+      if (!this.pool || this.globalDVMSubscription) return
 
       try {
-        // Listen for DVM response events (kind 6107)
+        console.log('Setting up global DVM subscription for 6107 events')
+        
+        // Subscribe to all 6107 events since now
         const filter = {
           kinds: [6107],
-          authors: [device.pubkey],
-          '#e': [requestId],
           since: Math.floor(Date.now() / 1000)
         }
 
-        let responseReceived = false
-
-        // Set up subscription
-        const sub = this.pool.subscribe(this.relays, filter, {
-          onevent: async (event) => {
-            // Only process the first valid response to avoid duplicates
-            if (responseReceived) {
-              console.log('Ignoring duplicate response for request:', requestId)
-              return
-            }
-
-            try {
-              console.log('Received DVM response event:', event)
-
-              // Validate event structure
-              if (!event || !event.kind || event.kind !== 6107) {
-                console.warn('Invalid event structure:', event)
-                return
-              }
-
-              // Verify this response is for our request
-              const eventTag = event.tags.find(tag => tag[0] === 'e' && tag[1] === requestId)
-              if (!eventTag) {
-                console.warn('Response event ID does not match request:', event.id)
-                return
-              }
-
-              // Check if response contains bolt11 invoice in amount tag (for kind 6107)
-              const amountTag = event.tags.find(tag => tag[0] === 'amount')
-              if (amountTag && amountTag[2]) {
-                // Payment required - keep subscription open for actual response after payment
-                console.log('Payment required, keeping subscription open for final response')
-                this.showInvoiceQR(amountTag[2], amountTag[1])
-                this.setCapabilityState(stateKey, {
-                  loading: true, // Keep loading state since we're waiting for final response
-                  result: `Payment required: ${amountTag[1]} sats`
-                })
-                // DO NOT set responseReceived = true or close subscription
-                // DO NOT clear timeout - we still need to wait for final response
-              } else {
-                // Final response received - close subscription
-                responseReceived = true
-                clearTimeout(timeoutId)
-
-                // Display response content
-                this.invoiceDialog.show = false
-                this.setCapabilityState(stateKey, {
-                  loading: false,
-                  result: event.content || 'Success'
-                })
-
-                // Optional: Still show notification for important responses
-                // if (event.content) {
-                //   this.$q.notify({
-                //     type: 'positive',
-                //     message: `${capability}: ${event.content}`
-                //   })
-                // }
-
-                // Close subscription after successful processing
-                setTimeout(() => sub.close(), 1000)
-              }
-
-            } catch (error) {
-              console.error('Error processing DVM response:', error)
-              this.setCapabilityState(stateKey, {
-                loading: false,
-                result: 'Error processing response'
-              })
-              responseReceived = true
-              clearTimeout(timeoutId)
-              setTimeout(() => sub.close(), 1000)
-            }
+        this.globalDVMSubscription = this.pool.subscribe(this.relays, filter, {
+          onevent: (event) => {
+            this.handleDVMResponse(event)
           },
           oneose: () => {
-            console.log('End of stored events for DVM response')
+            console.log('Global DVM subscription: End of stored events')
           },
           onclose: (reason) => {
-            console.log('DVM response subscription closed:', reason)
+            console.log('Global DVM subscription closed:', reason)
+            // Attempt to reconnect after a delay if not manually closed
+            if (reason !== 'manual' && this.isAuthenticated) {
+              setTimeout(() => {
+                if (this.isAuthenticated && !this.globalDVMSubscription) {
+                  console.log('Reconnecting global DVM subscription')
+                  this.setupGlobalDVMSubscription()
+                }
+              }, 5000)
+            }
           }
         })
 
-        const timeoutId = setTimeout(() => {
-          if (!responseReceived) {
-            console.warn('Timeout waiting for DVM response:', requestId)
-            this.setCapabilityState(stateKey, {
-              loading: false,
-              result: null
-            })
-          }
-        }, 10000)
-
+        console.log('Global DVM subscription established')
       } catch (error) {
-        console.error('Failed to listen for DVM response:', error)
-        this.setCapabilityState(stateKey, { loading: false })
+        console.error('Failed to setup global DVM subscription:', error)
       }
     },
+
+    // Handle incoming DVM responses
+    handleDVMResponse(event) {
+      try {
+        console.log('Received DVM response event:', event)
+
+        // Validate event structure
+        if (!event || !event.kind || event.kind !== 6107) {
+          console.warn('Invalid event structure:', event)
+          return
+        }
+
+        // Find the request ID this response is for
+        const eventTag = event.tags.find(tag => tag[0] === 'e')
+        if (!eventTag || !eventTag[1]) {
+          console.warn('No request ID found in response event')
+          return
+        }
+
+        const requestId = eventTag[1]
+        const pendingRequest = this.pendingRequests.get(requestId)
+        
+        if (!pendingRequest) {
+          console.log('No pending request found for response:', requestId)
+          return
+        }
+
+        // Process the response
+        this.processDVMResponse(event, pendingRequest)
+
+      } catch (error) {
+        console.error('Error handling DVM response:', error)
+      }
+    },
+
+    // Process DVM response for a specific request
+    processDVMResponse(event, pendingRequest) {
+      const { device, capability, stateKey } = pendingRequest
+
+      try {
+        // Check if response contains bolt11 invoice in amount tag (for kind 6107)
+        const amountTag = event.tags.find(tag => tag[0] === 'amount')
+        if (amountTag && amountTag[2]) {
+          // Payment required - keep request pending for actual response after payment
+          console.log('Payment required, keeping request pending for final response')
+          this.showInvoiceQR(amountTag[2], amountTag[1])
+          this.setCapabilityState(stateKey, {
+            loading: true, // Keep loading state since we're waiting for final response
+            result: `Payment required: ${amountTag[1]} sats`
+          })
+          // DO NOT remove from pendingRequests - we still need to wait for final response
+        } else {
+          // Final response received - complete the request
+          console.log('Final response received for request:', event.tags.find(tag => tag[0] === 'e')[1])
+          
+          // Remove from pending requests
+          this.pendingRequests.delete(event.tags.find(tag => tag[0] === 'e')[1])
+
+          // Clear any payment dialog
+          this.invoiceDialog.show = false
+          
+          // Update capability state with result
+          this.setCapabilityState(stateKey, {
+            loading: false,
+            result: event.content || 'Success'
+          })
+
+          console.log(`Capability ${capability} completed:`, event.content)
+        }
+
+      } catch (error) {
+        console.error('Error processing DVM response:', error)
+        this.setCapabilityState(stateKey, {
+          loading: false,
+          result: 'Error processing response'
+        })
+        // Remove from pending requests on error
+        this.pendingRequests.delete(event.tags.find(tag => tag[0] === 'e')[1])
+      }
+    },
+
 
     // Show invoice QR code
     showInvoiceQR(bolt11, amount) {
