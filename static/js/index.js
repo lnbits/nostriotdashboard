@@ -1072,6 +1072,38 @@ window.app = Vue.createApp({
     async refreshDevices() {
       await this.fetchFollowList()
       await this.discoverIoTDevices()
+    },
+
+    // Handle page becoming visible (mobile browser resumed)
+    handlePageVisible() {
+      if (!this.isAuthenticated || !this.pool) return
+
+      console.log('Checking connection health after page became visible')
+      
+      // Check if global subscription is still active
+      if (!this.globalDVMSubscription) {
+        console.log('Global DVM subscription not active, reconnecting')
+        this.setupGlobalDVMSubscription()
+        return
+      }
+
+      // Test connection health by checking if pool can communicate
+      this.checkConnectionHealth()
+    },
+
+    // Check if WebSocket connections are still healthy
+    checkConnectionHealth() {
+      if (!this.pool || !this.isAuthenticated) return
+
+      // Close and recreate the global subscription to ensure fresh connections
+      if (this.globalDVMSubscription) {
+        console.log('Refreshing global DVM subscription for connection health')
+        this.globalDVMSubscription.close()
+        this.globalDVMSubscription = null
+      }
+      
+      // Re-establish subscription with fresh connections
+      this.setupGlobalDVMSubscription()
     }
   },
 
@@ -1081,6 +1113,14 @@ window.app = Vue.createApp({
     console.log('SimplePool available:', typeof window.NostrTools?.SimplePool !== 'undefined')
     console.log('QRCode available:', typeof window.QRCode !== 'undefined')
     console.log('Nostr extension available:', typeof window.nostr !== 'undefined')
+
+    // Setup page visibility event listener for mobile browser handling
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.isAuthenticated) {
+        console.log('Page became visible, checking connections')
+        this.handlePageVisible()
+      }
+    })
 
     // Attempt auto-login
     await this.autoLogin()

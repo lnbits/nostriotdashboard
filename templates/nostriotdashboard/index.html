@@ -4,7 +4,7 @@
 
 {% extends "base.html" %} {% from "macros.jinja" import window_vars with context
 %} {% block scripts %} {{ window_vars(user) }}
-<script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+<script src="{{ static_url_for('nostriotdashboard/static', path='js/nostr-tools.bundle.js') }}"></script>
 <script src="{{ static_url_for('nostriotdashboard/static', path='js/index.js') }}"></script>
 {% endblock %} {% block page %}
 
