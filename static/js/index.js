@@ -532,7 +532,7 @@ window.app = Vue.createApp({
             this.pendingRequests.delete(signedEvent.id)
             this.setCapabilityState(stateKey, {
               loading: false,
-              result: 'Request timeout'
+              result: null
             })
           }
         }, 30000) // 30 second timeout
@@ -603,7 +603,7 @@ window.app = Vue.createApp({
             this.pendingRequests.delete(signedEvent.id)
             this.setCapabilityState(stateKey, {
               loading: false,
-              result: 'Request timeout'
+              result: null
             })
           }
         }, 30000) // 30 second timeout
