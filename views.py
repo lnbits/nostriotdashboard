@@ -34,6 +34,14 @@ async def index(req: Request, user: User = Depends(check_user_exists)):
     )
 
 
+# Public page (no authentication required)
+@nostriotdashboard_generic_router.get("/public", response_class=HTMLResponse)
+async def public_index(req: Request):
+    return nostriotdashboard_renderer().TemplateResponse(
+        "nostriotdashboard/index.html", {"request": req, "user": None}
+    )
+
+
 # Frontend shareable page
 
 

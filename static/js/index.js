@@ -747,7 +747,7 @@ window.app = Vue.createApp({
         this.invoiceDialog.paymentLoading = false
         this.invoiceDialog.show = true
 
-        // Set default wallet if none selected and wallets are available
+        // Set default wallet if none selected and wallets are available (LNbits users only)
         if (!this.selectedWallet && this.g && this.g.user && this.g.user.wallets && this.g.user.wallets.length > 0) {
           this.selectedWallet = this.g.user.wallets[0].id
         }

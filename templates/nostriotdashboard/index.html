@@ -2,7 +2,7 @@
 <!--//PAGE FOR THE EXTENSIONS BACKEND IN LNBITS//////-->
 <!--/////////////////////////////////////////////////-->
 
-{% extends "base.html" %} {% from "macros.jinja" import window_vars with context
+{% extends "public.html" if not user else "base.html" %} {% from "macros.jinja" import window_vars with context
 %} {% block scripts %} {{ window_vars(user) }}
 <script src="{{ static_url_for('nostriotdashboard/static', path='js/nostr-tools.bundle.js') }}"></script>
 <script src="{{ static_url_for('nostriotdashboard/static', path='js/index.js') }}"></script>
@@ -352,8 +352,8 @@
               <p class="text-caption">Amount: ${invoiceDialog.amount} sats</p>
             </q-card-section>
             
-            <!-- Payment Options -->
-            <q-card-section class="q-pt-none">
+            <!-- Payment Options (only show for logged in LNbits users) -->
+            <q-card-section v-if="g && g.user && g.user.wallets" class="q-pt-none">
               <!-- Wallet Selection -->
               <div class="q-mb-md">
                 <q-select
@@ -383,8 +383,8 @@
               />
             </q-card-section>
 
-            <!-- Divider -->
-              <div class="row items-center q-mb-md">
+            <!-- Divider (show "or" only if LNbits wallet options are available) -->
+              <div v-if="g && g.user && g.user.wallets" class="row items-center q-mb-md">
                 <div class="col">
                   <q-separator />
                 </div>
@@ -394,6 +394,11 @@
                 <div class="col">
                   <q-separator />
                 </div>
+              </div>
+              
+              <!-- Message for public users -->
+              <div v-else class="q-mb-md">
+                <p class="text-caption text-grey-6 text-center">Scan QR code with a lightning wallet to pay</p>
               </div>
             
             <!-- QR Code Section -->
