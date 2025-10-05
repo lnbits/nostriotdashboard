@@ -72,6 +72,7 @@ window.app = Vue.createApp({
   },
 
   methods: {
+
     getReadableCapability(capability) {
       let spaced = capability.replace(/([a-z])([A-Z])/g, '$1 $2');
       return spaced.charAt(0).toUpperCase() + spaced.slice(1);
@@ -84,7 +85,7 @@ window.app = Vue.createApp({
 
     // Utility methods for explore view
     formatPubkey(pubkey) {
-      return pubkey.substring(0, 8) + '...' + pubkey.substring(pubkey.length - 8)
+      return window.NostrTools.nip19.npubEncode(pubkey)
     },
 
     formatDate(timestamp) {
@@ -438,6 +439,7 @@ window.app = Vue.createApp({
 
         const events = await this.pool.querySync(this.relays, filter)
         console.log('Fetched DVM advertisement events:', events)
+
         this.iotDevices = []
 
         for (const event of events) {
@@ -445,7 +447,8 @@ window.app = Vue.createApp({
           const kTag = event.tags.find(tag => tag[0] === 'k' && tag[1] === '5107')
           if (kTag) {
             const device = this.parseIoTDevice(event)
-            if (device) {
+            console.log('Parsed device:', device)
+            if (device && !this.iotDevices.some(d => d.pubkey === device.pubkey)) {
               this.iotDevices.push(device)
             }
           }
@@ -475,12 +478,14 @@ window.app = Vue.createApp({
         const content = JSON.parse(event.content)
         const capabilitiesTag = event.tags.find(tag => tag[0] === 't')
         const capabilities = capabilitiesTag ? capabilitiesTag.slice(1) : []
+        const lastSeen = event.created_at
 
         return {
           pubkey: event.pubkey,
           name: content.name || 'Unknown Device',
           about: content.about || 'No description',
-          capabilities: capabilities
+          capabilities: capabilities,
+          lastSeen: lastSeen
         }
       } catch (error) {
         console.error('Failed to parse device:', error)
@@ -624,7 +629,7 @@ window.app = Vue.createApp({
 
       try {
         console.log('Setting up global DVM subscription for 6107 events')
-        
+
         // Subscribe to all 6107 events since now
         const filter = {
           kinds: [6107],
@@ -678,7 +683,7 @@ window.app = Vue.createApp({
 
         const requestId = eventTag[1]
         const pendingRequest = this.pendingRequests.get(requestId)
-        
+
         if (!pendingRequest) {
           console.log('No pending request found for response:', requestId)
           return
@@ -711,13 +716,13 @@ window.app = Vue.createApp({
         } else {
           // Final response received - complete the request
           console.log('Final response received for request:', event.tags.find(tag => tag[0] === 'e')[1])
-          
+
           // Remove from pending requests
           this.pendingRequests.delete(event.tags.find(tag => tag[0] === 'e')[1])
 
           // Clear any payment dialog
           this.invoiceDialog.show = false
-          
+
           // Update capability state with result
           this.setCapabilityState(stateKey, {
             loading: false,
@@ -861,7 +866,7 @@ window.app = Vue.createApp({
           since: since
         }
 
-        console.log('Querying for service providers since:', new Date(oneWeekAgo * 1000))
+        console.log('Querying for service providers since:', new Date(since * 1000))
         const events = await this.pool.querySync(this.relays, filter)
         console.log('Fetched service provider events:', events.length)
 
@@ -1078,7 +1083,7 @@ window.app = Vue.createApp({
       if (!this.isAuthenticated || !this.pool) return
 
       console.log('Checking connection health after page became visible')
-      
+
       // Check if global subscription is still active
       if (!this.globalDVMSubscription) {
         console.log('Global DVM subscription not active, reconnecting')
@@ -1100,7 +1105,7 @@ window.app = Vue.createApp({
         this.globalDVMSubscription.close()
         this.globalDVMSubscription = null
       }
-      
+
       // Re-establish subscription with fresh connections
       this.setupGlobalDVMSubscription()
     }

@@ -143,8 +143,39 @@
               class="col-12 col-md-6"
             >
               <q-card-section>
-                <div class="text-h6">${device.name}</div>
-                <p class="text-caption q-mb-md">${device.about}</p>
+                <div class="row items-start justify-between q-mb-sm">
+                  <div class="col">
+                    <div class="text-h6">${device.name}</div>
+                    <p class="text-caption text-grey-6 q-mb-none" style="overflow-wrap: break-word;">${formatPubkey(device.pubkey)}</p>
+                    <p class="text-caption q-mb-sm">${device.about}</p>
+                </div>
+                <div class="col-auto">
+                  <div v-if="isFollowing(device.pubkey)">
+                    <q-btn
+                      color="negative"
+                      icon="person_remove"
+                      label="Unfollow"
+                      size="sm"
+                      @click="unfollowProvider(device)"
+                      :loading="followingStates[device.pubkey]"
+                      outline
+                      dense
+                    />
+                    </div>
+                    <div v-else>
+                      <q-btn
+                        v-if="!isFollowing(device.pubkey)"
+                        color="primary"
+                        icon="person_add"
+                        label="Follow"
+                        size="sm"
+                        @click="followProvider(provider)"
+                        outline
+                        dense
+                      />
+                    </div>
+                    </div>
+                </div>
                 
                 <div class="q-gutter-xs">
                   <div v-for="capability in device.capabilities" :key="capability" class="full-width">
@@ -200,7 +231,11 @@
 
                   </div>
                 </div>
+                <div v-if="device.lastSeen" class="text-caption text-grey-6 q-mt-sm">
+                  Last seen: ${formatDate(device.lastSeen)}
+                </div>
               </q-card-section>
+              
             </q-card>
           </div>
 
@@ -272,7 +307,7 @@
                     <div class="row items-start justify-between q-mb-sm">
                       <div class="col">
                         <h6 class="q-ma-none text-weight-bold">${provider.name}</h6>
-                        <p class="text-caption text-grey-6 q-mb-sm">${formatPubkey(provider.pubkey)}</p>
+                        <p class="text-caption text-grey-6 q-mb-sm" style="overflow-wrap: break-word;">${formatPubkey(provider.pubkey)}</p>
                       </div>
                       <div class="col-auto">
                         <div v-if="isFollowing(provider.pubkey)">
@@ -327,7 +362,7 @@
                     </div>
                     
                     <div class="text-caption text-grey-6 q-mt-sm">
-                      Last updated: ${formatDate(provider.created_at)}
+                      Last seen: ${formatDate(provider.created_at)}
                     </div>
                   </q-card-section>
                 </q-card>
