@@ -855,11 +855,10 @@ window.app = Vue.createApp({
     async discoverServiceProviders() {
       this.loadingProviders = true
       try {
-        // Query for all DVM advertisements (kind 31990) from past week
-        const oneWeekAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
+        const since = Math.floor(Date.now() / 1000) - (60 * 60 * 6) // 6 hours ago
         const filter = {
           kinds: [31990],
-          since: oneWeekAgo
+          since: since
         }
 
         console.log('Querying for service providers since:', new Date(oneWeekAgo * 1000))
