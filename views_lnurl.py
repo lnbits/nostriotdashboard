@@ -33,7 +33,8 @@ async def api_lnurl_pay(
     return {
         "callback": str(
             request.url_for(
-                "nostriotdashboard.api_lnurl_pay_callback", nostriotdashboard_id=nostriotdashboard_id
+                "nostriotdashboard.api_lnurl_pay_callback",
+                nostriotdashboard_id=nostriotdashboard_id,
             )
         ),
         "maxSendable": nostriotdashboard.lnurlpayamount * 1000,
@@ -72,7 +73,10 @@ async def api_lnurl_pay_cb(
     return {
         "pr": payment.bolt11,
         "routes": [],
-        "successAction": {"tag": "message", "message": f"Paid {nostriotdashboard.name}"},
+        "successAction": {
+            "tag": "message",
+            "message": f"Paid {nostriotdashboard.name}",
+        },
     }
 
 
@@ -102,7 +106,8 @@ async def api_lnurl_withdraw(
         "tag": "withdrawRequest",
         "callback": str(
             request.url_for(
-                "nostriotdashboard.api_lnurl_withdraw_callback", nostriotdashboard_id=nostriotdashboard_id
+                "nostriotdashboard.api_lnurl_withdraw_callback",
+                nostriotdashboard_id=nostriotdashboard_id,
             )
         ),
         "k1": k1,

@@ -2,8 +2,8 @@
 <!--//PAGE FOR THE EXTENSIONS BACKEND IN LNBITS//////-->
 <!--/////////////////////////////////////////////////-->
 
-{% extends "public.html" if not user else "base.html" %} {% from "macros.jinja" import window_vars with context
-%} {% block scripts %} {{ window_vars(user) }}
+{% extends "public.html" if not user else "base.html" %} {% from "macros.jinja"
+import window_vars with context %} {% block scripts %} {{ window_vars(user) }}
 <script src="{{ static_url_for('nostriotdashboard/static', path='js/nostr-tools.bundle.js') }}"></script>
 <script src="{{ static_url_for('nostriotdashboard/static', path='js/index.js') }}"></script>
 {% endblock %} {% block page %}
@@ -12,17 +12,18 @@
   <q-layout view="hHh lpR fFf">
     <q-page-container>
       <q-page class="q-pa-md">
-        
         <!-- Header -->
         <div class="row q-mb-lg">
           <div class="col">
             <h4 class="q-mt-none q-mb-md">Nostr IoT Dashboard</h4>
-            <p class="text-caption">Interact with Nostr IoT devices using DVM protocol</p>
+            <p class="text-caption">
+              Interact with Nostr IoT devices using DVM protocol
+            </p>
           </div>
           <div v-if="isAuthenticated" class="col-auto">
-            <q-btn 
-              color="negative" 
-              label="Logout" 
+            <q-btn
+              color="negative"
+              label="Logout"
               @click="logout"
               icon="logout"
               outline
@@ -36,26 +37,26 @@
           <q-card-section>
             <h6 class="q-mt-none">Connect with Nostr</h6>
             <p class="text-caption">Choose your authentication method</p>
-            <div class=" flex row">
-            <div class="q-mr-md">
-              <q-btn 
-                color="primary" 
-                label="Log in with browser extension" 
-                @click="connectNostr"
-                :loading="connecting && authMethod === 'extension'"
-                icon="extension"
-              />
+            <div class="flex row">
+              <div class="q-mr-md">
+                <q-btn
+                  color="primary"
+                  label="Log in with browser extension"
+                  @click="connectNostr"
+                  :loading="connecting && authMethod === 'extension'"
+                  icon="extension"
+                />
+              </div>
+              <div>
+                <q-btn
+                  color="secondary"
+                  label="Log in with private key"
+                  @click="showNsecDialog"
+                  :loading="connecting && authMethod === 'nsec'"
+                  icon="vpn_key"
+                />
+              </div>
             </div>
-            <div>
-              <q-btn 
-                color="secondary" 
-                label="Log in with private key" 
-                @click="showNsecDialog"
-                :loading="connecting && authMethod === 'nsec'"
-                icon="vpn_key"
-              />
-              </div>
-              </div>
           </q-card-section>
         </q-card>
 
@@ -64,18 +65,18 @@
           <q-card-section>
             <div class="row items-center q-mb-md">
               <h6 class="q-mt-none q-mb-none col">Relay Configuration</h6>
-              <q-btn 
-                size="sm" 
-                color="primary" 
-                icon="add" 
-                @click="addRelay" 
-                round 
+              <q-btn
+                size="sm"
+                color="primary"
+                icon="add"
+                @click="addRelay"
+                round
                 dense
               />
             </div>
             <div class="row q-gutter-sm">
-              <q-chip 
-                v-for="relay in relays" 
+              <q-chip
+                v-for="relay in relays"
                 :key="relay"
                 :label="relay"
                 removable
@@ -96,49 +97,57 @@
             </h6>
             <div class="col-auto q-gutter-sm flex">
               <p>
-              <q-btn 
-                size="sm" 
-                color="secondary" 
-                icon="explore" 
-                :label="exploreButtonLabel"
-                @click="toggleExploreView"
-                outline
-              />
+                <q-btn
+                  size="sm"
+                  color="secondary"
+                  icon="explore"
+                  :label="exploreButtonLabel"
+                  @click="toggleExploreView"
+                  outline
+                />
               </p>
               <p>
-              <q-btn 
-                v-if="!showExploreView"
-                size="sm" 
-                color="positive" 
-                icon="refresh" 
-                @click="refreshDevices"
-                :loading="loadingDevices"
-                round 
-                dense
-              />
+                <q-btn
+                  v-if="!showExploreView"
+                  size="sm"
+                  color="positive"
+                  icon="refresh"
+                  @click="refreshDevices"
+                  :loading="loadingDevices"
+                  round
+                  dense
+                />
               </p>
             </div>
           </div>
 
           <!-- Loading State -->
-          <div v-if="loadingDevices && !showExploreView" class="text-center q-pa-lg">
+          <div
+            v-if="loadingDevices && !showExploreView"
+            class="text-center q-pa-lg"
+          >
             <q-spinner size="xl" color="primary" />
             <p class="q-mt-md">Discovering IoT devices...</p>
           </div>
 
           <!-- No Devices Found -->
-          <q-card v-else-if="iotDevices.length === 0 && !showExploreView" class="text-center q-pa-lg">
+          <q-card
+            v-else-if="iotDevices.length === 0 && !showExploreView"
+            class="text-center q-pa-lg"
+          >
             <q-card-section>
               <q-icon name="device_hub" size="xl" color="grey-5" />
               <h6 class="q-mt-md q-mb-sm">No IoT devices found</h6>
-              <p class="text-caption">Follow some Nostr accounts that provide IoT services</p>
+              <p class="text-caption">
+                Follow some Nostr accounts that provide IoT services
+              </p>
             </q-card-section>
           </q-card>
 
           <!-- Device List -->
           <div v-else-if="!showExploreView" class="row q-gutter-md">
-            <q-card 
-              v-for="device in iotDevices" 
+            <q-card
+              v-for="device in iotDevices"
               :key="device.pubkey"
               class="col-12 col-md-6"
             >
@@ -146,21 +155,26 @@
                 <div class="row items-start justify-between q-mb-sm">
                   <div class="col">
                     <div class="text-h6">${device.name}</div>
-                    <p class="text-caption text-grey-6 q-mb-none" style="overflow-wrap: break-word;">${formatPubkey(device.pubkey)}</p>
+                    <p
+                      class="text-caption text-grey-6 q-mb-none"
+                      style="overflow-wrap: break-word"
+                    >
+                      ${formatPubkey(device.pubkey)}
+                    </p>
                     <p class="text-caption q-mb-sm">${device.about}</p>
-                </div>
-                <div class="col-auto">
-                  <div v-if="isFollowing(device.pubkey)">
-                    <q-btn
-                      color="negative"
-                      icon="person_remove"
-                      label="Unfollow"
-                      size="sm"
-                      @click="unfollowProvider(device)"
-                      :loading="followingStates[device.pubkey]"
-                      outline
-                      dense
-                    />
+                  </div>
+                  <div class="col-auto">
+                    <div v-if="isFollowing(device.pubkey)">
+                      <q-btn
+                        color="negative"
+                        icon="person_remove"
+                        label="Unfollow"
+                        size="sm"
+                        @click="unfollowProvider(device)"
+                        :loading="followingStates[device.pubkey]"
+                        outline
+                        dense
+                      />
                     </div>
                     <div v-else>
                       <q-btn
@@ -174,12 +188,15 @@
                         dense
                       />
                     </div>
-                    </div>
+                  </div>
                 </div>
-                
+
                 <div class="q-gutter-xs">
-                  <div v-for="capability in device.capabilities" :key="capability" class="full-width">
-                    
+                  <div
+                    v-for="capability in device.capabilities"
+                    :key="capability"
+                    class="full-width"
+                  >
                     <!-- Get methods (simple button) -->
                     <q-btn
                       v-if="!isSetMethod(capability)"
@@ -192,8 +209,8 @@
                       class="full-width text-left"
                     >
                       <div class="column full-width">
-                        <div 
-                          v-if="getCapabilityResult(device.pubkey, capability)" 
+                        <div
+                          v-if="getCapabilityResult(device.pubkey, capability)"
                           class="text-caption text-grey-6 q-mt-xs"
                         >
                           ${getCapabilityResult(device.pubkey, capability)}
@@ -203,7 +220,9 @@
 
                     <!-- Set methods (input + button) -->
                     <q-card v-else flat bordered class="q-pa-sm">
-                      <div class="text-weight-medium q-mb-sm">${getReadableCapability(capability)}</div>
+                      <div class="text-weight-medium q-mb-sm">
+                        ${getReadableCapability(capability)}
+                      </div>
                       <div class="row q-gutter-sm items-center">
                         <q-input
                           v-model="setMethodInputs[device.pubkey + ':' + capability]"
@@ -221,27 +240,27 @@
                           :disable="!setMethodInputs[device.pubkey + ':' + capability]"
                         />
                       </div>
-                      <div 
-                        v-if="getCapabilityResult(device.pubkey, capability)" 
+                      <div
+                        v-if="getCapabilityResult(device.pubkey, capability)"
                         class="text-caption text-grey-6 q-mt-sm"
                       >
                         ${getCapabilityResult(device.pubkey, capability)}
                       </div>
                     </q-card>
-
                   </div>
                 </div>
-                <div v-if="device.lastSeen" class="text-caption text-grey-6 q-mt-sm">
+                <div
+                  v-if="device.lastSeen"
+                  class="text-caption text-grey-6 q-mt-sm"
+                >
                   Last seen: ${formatDate(device.lastSeen)}
                 </div>
               </q-card-section>
-              
             </q-card>
           </div>
 
           <!-- Explore Service Providers View -->
           <div v-if="showExploreView">
-            
             <!-- Search and Filter Section -->
             <q-card class="q-mb-lg">
               <q-card-section>
@@ -260,7 +279,7 @@
                     </q-input>
                   </div>
                   <div class="col-auto">
-                    <q-btn 
+                    <q-btn
                       color="primary"
                       icon="refresh"
                       label="Refresh"
@@ -280,16 +299,21 @@
             </div>
 
             <!-- No Providers Found -->
-            <div v-else-if="filteredProviders.length === 0 && !loadingProviders" class="text-center q-pa-lg">
+            <div
+              v-else-if="filteredProviders.length === 0 && !loadingProviders"
+              class="text-center q-pa-lg"
+            >
               <q-icon name="search_off" size="4rem" color="grey-5" />
               <p class="q-mt-md text-grey-6">
-                <span v-if="searchTerm">No service providers found matching "${searchTerm}"</span>
+                <span v-if="searchTerm"
+                  >No service providers found matching "${searchTerm}"</span
+                >
                 <span v-else>No IoT service providers found</span>
               </p>
-              <q-btn 
+              <q-btn
                 v-if="!searchTerm"
-                color="primary" 
-                label="Refresh Search" 
+                color="primary"
+                label="Refresh Search"
                 @click="discoverServiceProviders"
                 outline
               />
@@ -297,8 +321,8 @@
 
             <!-- Providers Grid -->
             <div v-else class="row q-gutter-md">
-              <div 
-                v-for="provider in filteredProviders" 
+              <div
+                v-for="provider in filteredProviders"
                 :key="provider.pubkey"
                 class="col-12 col-sm-6 col-md-4"
               >
@@ -306,21 +330,28 @@
                   <q-card-section>
                     <div class="row items-start justify-between q-mb-sm">
                       <div class="col">
-                        <h6 class="q-ma-none text-weight-bold">${provider.name}</h6>
-                        <p class="text-caption text-grey-6 q-mb-sm" style="overflow-wrap: break-word;">${formatPubkey(provider.pubkey)}</p>
+                        <h6 class="q-ma-none text-weight-bold">
+                          ${provider.name}
+                        </h6>
+                        <p
+                          class="text-caption text-grey-6 q-mb-sm"
+                          style="overflow-wrap: break-word"
+                        >
+                          ${formatPubkey(provider.pubkey)}
+                        </p>
                       </div>
                       <div class="col-auto">
                         <div v-if="isFollowing(provider.pubkey)">
-                        <q-btn
-                          color="negative"
-                          icon="person_remove"
-                          label="Unfollow"
-                          size="sm"
-                          @click="unfollowProvider(provider)"
-                          :loading="followingStates[provider.pubkey]"
-                          outline
-                          dense
-                        />
+                          <q-btn
+                            color="negative"
+                            icon="person_remove"
+                            label="Unfollow"
+                            size="sm"
+                            @click="unfollowProvider(provider)"
+                            :loading="followingStates[provider.pubkey]"
+                            outline
+                            dense
+                          />
                         </div>
                         <div v-else>
                           <q-btn
@@ -334,14 +365,15 @@
                             dense
                           />
                         </div>
-                        
                       </div>
                     </div>
-                    
+
                     <p class="text-body2 q-mb-md">${provider.about}</p>
-                    
+
                     <div v-if="provider.capabilities.length > 0">
-                      <p class="text-caption text-weight-medium q-mb-sm">Capabilities:</p>
+                      <p class="text-caption text-weight-medium q-mb-sm">
+                        Capabilities:
+                      </p>
                       <div class="row q-gutter-xs">
                         <q-chip
                           v-for="capability in provider.capabilities.slice(0, 6)"
@@ -360,7 +392,7 @@
                         />
                       </div>
                     </div>
-                    
+
                     <div class="text-caption text-grey-6 q-mt-sm">
                       Last seen: ${formatDate(provider.created_at)}
                     </div>
@@ -368,11 +400,15 @@
                 </q-card>
               </div>
             </div>
-            
+
             <!-- Results Summary -->
-            <div v-if="!loadingProviders && serviceProviders.length > 0" class="text-center q-mt-lg">
+            <div
+              v-if="!loadingProviders && serviceProviders.length > 0"
+              class="text-center q-mt-lg"
+            >
               <p class="text-caption text-grey-6">
-                Showing ${filteredProviders.length} of ${serviceProviders.length} service providers
+                Showing ${filteredProviders.length} of
+                ${serviceProviders.length} service providers
                 <span v-if="searchTerm">(filtered by "${searchTerm}")</span>
               </p>
             </div>
@@ -386,9 +422,12 @@
               <div class="text-h6">Payment Required</div>
               <p class="text-caption">Amount: ${invoiceDialog.amount} sats</p>
             </q-card-section>
-            
+
             <!-- Payment Options (only show for logged in LNbits users) -->
-            <q-card-section v-if="g && g.user && g.user.wallets" class="q-pt-none">
+            <q-card-section
+              v-if="g && g.user && g.user.wallets"
+              class="q-pt-none"
+            >
               <!-- Wallet Selection -->
               <div class="q-mb-md">
                 <q-select
@@ -403,8 +442,6 @@
                   map-options
                   class="q-mb-sm"
                 />
-                
-                
               </div>
               <q-btn
                 color="primary"
@@ -419,23 +456,30 @@
             </q-card-section>
 
             <!-- Divider (show "or" only if LNbits wallet options are available) -->
-              <div v-if="g && g.user && g.user.wallets" class="row items-center q-mb-md">
-                <div class="col">
-                  <q-separator />
-                </div>
-                <div class="col-auto q-px-md flex flex-column items-center">
-                  <p class="text-caption text-grey-6 q-mb-none">or scan QR code with a lightning wallet</p>
-                </div>
-                <div class="col">
-                  <q-separator />
-                </div>
+            <div
+              v-if="g && g.user && g.user.wallets"
+              class="row items-center q-mb-md"
+            >
+              <div class="col">
+                <q-separator />
               </div>
-              
-              <!-- Message for public users -->
-              <div v-else class="q-mb-md">
-                <p class="text-caption text-grey-6 text-center">Scan QR code with a lightning wallet to pay</p>
+              <div class="col-auto q-px-md flex flex-column items-center">
+                <p class="text-caption text-grey-6 q-mb-none">
+                  or scan QR code with a lightning wallet
+                </p>
               </div>
-            
+              <div class="col">
+                <q-separator />
+              </div>
+            </div>
+
+            <!-- Message for public users -->
+            <div v-else class="q-mb-md">
+              <p class="text-caption text-grey-6 text-center">
+                Scan QR code with a lightning wallet to pay
+              </p>
+            </div>
+
             <!-- QR Code Section -->
             <q-card-section class="text-center q-pt-none">
               <lnbits-qrcode
@@ -444,7 +488,7 @@
                 class="rounded-borders"
               ></lnbits-qrcode>
             </q-card-section>
-            
+
             <q-card-actions align="right">
               <q-btn flat label="Close" @click="invoiceDialog.show = false" />
             </q-card-actions>
@@ -458,8 +502,8 @@
               <div class="text-h6">Add Relay</div>
             </q-card-section>
             <q-card-section>
-              <q-input 
-                v-model="relayDialog.url" 
+              <q-input
+                v-model="relayDialog.url"
                 label="Relay URL"
                 placeholder="wss://relay.example.com"
               />
@@ -476,37 +520,39 @@
           <q-card style="min-width: 400px">
             <q-card-section>
               <div class="text-h6">Enter Private Key</div>
-              <p class="text-caption">Enter your Nostr private key (nsec format)</p>
+              <p class="text-caption">
+                Enter your Nostr private key (nsec format)
+              </p>
             </q-card-section>
             <q-card-section>
-              <q-input 
-                v-model="nsecDialog.privateKey" 
+              <q-input
+                v-model="nsecDialog.privateKey"
                 label="Private Key (nsec...)"
                 placeholder="nsec1..."
                 type="password"
                 outlined
               />
               <div class="text-caption text-warning q-mt-sm">
-                 Your private key is only stored locally and never sent to any server
+                Your private key is only stored locally and never sent to any
+                server
               </div>
             </q-card-section>
             <q-card-actions align="right">
-              <div  class="q-mr-sm">
-              <q-btn flat label="Cancel" @click="nsecDialog.show = false" />
+              <div class="q-mr-sm">
+                <q-btn flat label="Cancel" @click="nsecDialog.show = false" />
               </div>
               <div>
-              <q-btn 
-                color="primary" 
-                label="Connect" 
-                @click="connectWithNsec"
-                :loading="connecting && authMethod === 'nsec'"
-                :disable="!nsecDialog.privateKey"
-              />
+                <q-btn
+                  color="primary"
+                  label="Connect"
+                  @click="connectWithNsec"
+                  :loading="connecting && authMethod === 'nsec'"
+                  :disable="!nsecDialog.privateKey"
+                />
               </div>
             </q-card-actions>
           </q-card>
         </q-dialog>
-
       </q-page>
     </q-page-container>
   </q-layout>

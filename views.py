@@ -58,7 +58,9 @@ async def nostriotdashboard(req: Request, nostriotdashboard_id):
             "request": req,
             "nostriotdashboard_id": nostriotdashboard_id,
             "lnurlpay": lnurler(myex.id, "nostriotdashboard.api_lnurl_pay", req),
-            "web_manifest": f"/nostriotdashboard/manifest/{nostriotdashboard_id}.webmanifest",
+            "web_manifest": (
+                f"/nostriotdashboard/manifest/{nostriotdashboard_id}.webmanifest"
+            ),
         },
     )
 
@@ -98,7 +100,9 @@ async def manifest(nostriotdashboard_id: str):
             {
                 "name": nostriotdashboard.name + " - " + settings.lnbits_site_title,
                 "short_name": nostriotdashboard.name,
-                "description": nostriotdashboard.name + " - " + settings.lnbits_site_title,
+                "description": nostriotdashboard.name
+                + " - "
+                + settings.lnbits_site_title,
                 "url": "/nostriotdashboard/" + nostriotdashboard_id,
             }
         ],
