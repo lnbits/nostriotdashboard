@@ -8,7 +8,7 @@ The Nostr IoT Dashboard extension provides a user interface for discovering and 
 
 - **Device Discovery**: Automatically finds IoT devices from your Nostr follow list that advertise DVM capabilities
 - **Real-time Control**: Execute device capabilities through Nostr DVM requests and receive responses
-- **Lightning Integration**: Seamless payment handling for premium IoT functions with QR code invoice display  
+- **Lightning Integration**: Seamless payment handling for premium IoT functions with QR code invoice display
 - **Multi-relay Support**: Connects to multiple Nostr relays for improved reliability
 - **Flexible Authentication**: Supports both Nostr browser extensions and manual private key input
 
@@ -22,8 +22,9 @@ The Nostr IoT Dashboard extension provides a user interface for discovering and 
 ## Supported Device Types
 
 This extension works with any IoT device that implements the Nostr DVM protocol, including:
+
 - Smart home devices (lights, switches, sensors)
-- Environmental monitors  
+- Environmental monitors
 - Industrial IoT equipment
 - Custom Nostr-enabled hardware
 

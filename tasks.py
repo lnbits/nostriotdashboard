@@ -41,7 +41,9 @@ async def on_invoice_paid(payment: Payment) -> None:
         total = nostriotdashboard.total + payment.amount
 
     nostriotdashboard.total = total
-    await update_nostriotdashboard(CreateNostriotDashboardData(**nostriotdashboard.dict()))
+    await update_nostriotdashboard(
+        CreateNostriotDashboardData(**nostriotdashboard.dict())
+    )
 
     # here we could send some data to a websocket on
     # wss://<your-lnbits>/api/v1/ws/<nostriotdashboard_id> and then listen to it on

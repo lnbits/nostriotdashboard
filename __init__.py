@@ -16,7 +16,9 @@ logger.debug(
 )
 
 
-nostriotdashboard_ext: APIRouter = APIRouter(prefix="/nostriotdashboard", tags=["NostriotDashboard"])
+nostriotdashboard_ext: APIRouter = APIRouter(
+    prefix="/nostriotdashboard", tags=["NostriotDashboard"]
+)
 nostriotdashboard_ext.include_router(nostriotdashboard_generic_router)
 nostriotdashboard_ext.include_router(nostriotdashboard_api_router)
 nostriotdashboard_ext.include_router(nostriotdashboard_lnurl_router)

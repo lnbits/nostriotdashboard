@@ -13,6 +13,14 @@ window.app = Vue.createApp({
 
       // Nostr
       relays: ['wss://relay.nostriot.com'],
+      // Default contact list relays
+      contactListRelays: [
+        'wss://relay.nostriot.com',
+        'wss://relay.damus.io',
+        'wss://nos.lol',
+        'wss://relay.nostr.band',
+        'wss://purplepag.es'
+      ],
       pool: null,
       globalDVMSubscription: null,
       pendingRequests: new Map(), // Track pending DVM requests
@@ -59,23 +67,25 @@ window.app = Vue.createApp({
       }
 
       const term = this.searchTerm.toLowerCase()
-      return this.serviceProviders.filter(provider =>
-        provider.name.toLowerCase().includes(term) ||
-        provider.about.toLowerCase().includes(term) ||
-        provider.capabilities.some(cap => cap.toLowerCase().includes(term))
+      return this.serviceProviders.filter(
+        provider =>
+          provider.name.toLowerCase().includes(term) ||
+          provider.about.toLowerCase().includes(term) ||
+          provider.capabilities.some(cap => cap.toLowerCase().includes(term))
       )
     },
 
     exploreButtonLabel() {
-      return this.showExploreView ? 'Show Your Devices' : 'Explore IoT Service Providers'
+      return this.showExploreView
+        ? 'Show Your Devices'
+        : 'Explore IoT Service Providers'
     }
   },
 
   methods: {
-
     getReadableCapability(capability) {
-      let spaced = capability.replace(/([a-z])([A-Z])/g, '$1 $2');
-      return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+      let spaced = capability.replace(/([a-z])([A-Z])/g, '$1 $2')
+      return spaced.charAt(0).toUpperCase() + spaced.slice(1)
     },
 
     // Check if capability is a set method
@@ -102,7 +112,6 @@ window.app = Vue.createApp({
     },
 
     isFollowing(pubkey) {
-      console.log('Checking if following:', pubkey, this.followList.includes(pubkey))
       return this.followList.includes(pubkey)
     },
 
@@ -144,7 +153,6 @@ window.app = Vue.createApp({
       }
 
       localStorage.setItem('nostriot_auth', JSON.stringify(authState))
-      console.log('Saved auth state:', authState.method)
     },
 
     // Load authentication state from localStorage
@@ -187,7 +195,6 @@ window.app = Vue.createApp({
         this.pool = null
       }
       this.pendingRequests.clear()
-      console.log('Cleared auth state')
     },
 
     // Auto-login on page load
@@ -195,13 +202,10 @@ window.app = Vue.createApp({
       const authState = this.loadAuthState()
       if (!authState) return
 
-      console.log('Attempting auto-login with method:', authState.method)
-
       try {
         if (authState.method === 'extension') {
           // Check if browser extension is still available
           if (!window.nostr) {
-            console.log('Nostr extension no longer available')
             this.clearAuthState()
             return
           }
@@ -209,7 +213,6 @@ window.app = Vue.createApp({
           // Verify the extension still has the same pubkey
           const currentPubkey = await window.nostr.getPublicKey()
           if (currentPubkey !== authState.pubkey) {
-            console.log('Extension pubkey changed, clearing auth')
             this.clearAuthState()
             return
           }
@@ -217,10 +220,8 @@ window.app = Vue.createApp({
           this.authMethod = 'extension'
           this.userPubkey = authState.pubkey
           this.isAuthenticated = true
-
         } else if (authState.method === 'nsec') {
           if (!authState.privateKey) {
-            console.log('No private key in stored auth')
             this.clearAuthState()
             return
           }
@@ -241,7 +242,6 @@ window.app = Vue.createApp({
           type: 'positive',
           message: `Auto-logged in with ${authState.method}`
         })
-
       } catch (error) {
         console.error('Auto-login failed:', error)
         this.clearAuthState()
@@ -310,14 +310,11 @@ window.app = Vue.createApp({
       try {
         let privateKey = this.nsecDialog.privateKey.trim()
 
-        console.log('Input private key:', privateKey.substring(0, 10) + '...')
-
         // Handle nsec format
         if (privateKey.startsWith('nsec1')) {
           try {
             const decoded = window.NostrTools.nip19.decode(privateKey)
             privateKey = decoded.data
-            console.log('Decoded from nsec format')
           } catch (decodeError) {
             console.error('Failed to decode nsec:', decodeError)
             throw new Error('Invalid nsec format')
@@ -326,22 +323,25 @@ window.app = Vue.createApp({
 
         // Convert to hex string if it's a Uint8Array
         if (privateKey instanceof Uint8Array) {
-          privateKey = Array.from(privateKey, byte => byte.toString(16).padStart(2, '0')).join('')
+          privateKey = Array.from(privateKey, byte =>
+            byte.toString(16).padStart(2, '0')
+          ).join('')
         }
 
-        console.log('Final private key format:', typeof privateKey, privateKey.length)
-
         // Validate private key format (64 hex characters)
-        if (typeof privateKey !== 'string' || !/^[a-fA-F0-9]{64}$/.test(privateKey)) {
-          throw new Error(`Invalid private key format: expected 64 hex chars, got ${privateKey.length} chars`)
+        if (
+          typeof privateKey !== 'string' ||
+          !/^[a-fA-F0-9]{64}$/.test(privateKey)
+        ) {
+          throw new Error(
+            `Invalid private key format: expected 64 hex chars, got ${privateKey.length} chars`
+          )
         }
 
         // Store private key and generate public key
         this.userPrivateKey = privateKey
         this.userPubkey = window.NostrTools.getPublicKey(privateKey)
         this.isAuthenticated = true
-
-        console.log('Generated public key:', this.userPubkey)
 
         // Close dialog
         this.nsecDialog.show = false
@@ -380,35 +380,25 @@ window.app = Vue.createApp({
     confirmAddRelay() {
       if (this.relayDialog.url && !this.relays.includes(this.relayDialog.url)) {
         this.relays.push(this.relayDialog.url)
-        console.log('Added relay:', this.relayDialog.url)
       }
       this.relayDialog.show = false
     },
 
     removeRelay(relayUrl) {
       this.relays = this.relays.filter(r => r !== relayUrl)
-      console.log('Removed relay:', relayUrl)
     },
 
     // Fetch user's follow list (NIP-02)
     async fetchFollowList() {
       try {
-        const filter = {
-          kinds: [3],
-          authors: [this.userPubkey],
-          limit: 1
-        }
+        const followEvent = await this.fetchContactListsFromMultipleRelays()
 
-        const events = await this.pool.querySync(this.relays, filter)
-        console.log('Fetched follow list events:', events)
-        if (events.length > 0) {
-          const followEvent = events[0]
+        if (followEvent) {
           this.followList = followEvent.tags
             .filter(tag => tag[0] === 'p')
             .map(tag => tag[1])
-          console.log('Follow list:', this.followList.length, 'accounts')
         } else {
-          console.log('No follow list found')
+          this.followList = []
         }
       } catch (error) {
         console.error('Failed to fetch follow list:', error)
@@ -419,12 +409,115 @@ window.app = Vue.createApp({
       }
     },
 
+    // Fetch contact lists from multiple relays and merge them
+    async fetchContactListsFromMultipleRelays() {
+      try {
+        const filter = {
+          kinds: [3],
+          authors: [this.userPubkey],
+          limit: 10 // Get multiple versions to find the most recent
+        }
+
+        // Fetch from all contact list relays concurrently
+        const relayPromises = this.contactListRelays.map(async relay => {
+          try {
+            const events = await this.pool.querySync([relay], filter)
+            return {relay, events}
+          } catch (error) {
+            console.warn(`Failed to fetch from relay ${relay}:`, error)
+            return {relay, events: []}
+          }
+        })
+
+        const relayResults = await Promise.all(relayPromises)
+
+        // Collect all contact list events from all relays
+        const allEvents = []
+        relayResults.forEach(result => {
+          result.events.forEach(event => {
+            allEvents.push({...event, sourceRelay: result.relay})
+          })
+        })
+
+        if (allEvents.length === 0) {
+          return null
+        }
+
+        // Sort by created_at to find the most recent contact list
+        allEvents.sort((a, b) => b.created_at - a.created_at)
+        const mostRecentEvent = allEvents[0]
+
+        // Merge all 'p' tags from all events to avoid losing follows
+        const allFollows = new Set()
+        const allContactData = new Map() // Store contact metadata (names, etc.)
+
+        allEvents.forEach(event => {
+          event.tags.forEach(tag => {
+            if (tag[0] === 'p') {
+              allFollows.add(tag[1])
+              // Store contact metadata if available
+              if (tag[2] || tag[3]) {
+                allContactData.set(tag[1], {
+                  relayUrl: tag[2] || '',
+                  name: tag[3] || ''
+                })
+              }
+            }
+          })
+        })
+
+        // Create merged contact list based on most recent event structure
+        const mergedContactList = {
+          ...mostRecentEvent,
+          tags: Array.from(allFollows).map(pubkey => {
+            const contactData = allContactData.get(pubkey)
+            if (contactData && (contactData.relayUrl || contactData.name)) {
+              return ['p', pubkey, contactData.relayUrl, contactData.name]
+            }
+            return ['p', pubkey]
+          })
+        }
+
+        return mergedContactList
+      } catch (error) {
+        console.error(
+          'Failed to fetch contact lists from multiple relays:',
+          error
+        )
+        return null
+      }
+    },
+
+    // Publish contact list to multiple relays
+    async publishContactListToMultipleRelays(signedEvent) {
+      const publishPromises = this.contactListRelays.map(async relay => {
+        try {
+          await this.pool.publish([relay], signedEvent)
+          return {relay, success: true}
+        } catch (error) {
+          console.warn(`Failed to publish contact list to ${relay}:`, error)
+          return {relay, success: false, error}
+        }
+      })
+
+      const results = await Promise.all(publishPromises)
+      const successful = results.filter(r => r.success).length
+      const failed = results.filter(r => !r.success).length
+
+      if (successful === 0) {
+        throw new Error('Failed to publish contact list to any relay')
+      }
+
+      return results
+    },
+
     // Discover IoT devices from follow list
     async discoverIoTDevices() {
       if (!this.followList.length) {
         this.$q.notify({
           type: 'info',
-          message: 'No follows found. Follow some Nostr accounts that provide IoT services.'
+          message:
+            'No follows found. Follow some Nostr accounts that provide IoT services.'
         })
         return
       }
@@ -438,23 +531,24 @@ window.app = Vue.createApp({
         }
 
         const events = await this.pool.querySync(this.relays, filter)
-        console.log('Fetched DVM advertisement events:', events)
 
         this.iotDevices = []
 
         for (const event of events) {
           // Filter for IoT devices (tag 'k' = '5107')
-          const kTag = event.tags.find(tag => tag[0] === 'k' && tag[1] === '5107')
+          const kTag = event.tags.find(
+            tag => tag[0] === 'k' && tag[1] === '5107'
+          )
           if (kTag) {
             const device = this.parseIoTDevice(event)
-            console.log('Parsed device:', device)
-            if (device && !this.iotDevices.some(d => d.pubkey === device.pubkey)) {
+            if (
+              device &&
+              !this.iotDevices.some(d => d.pubkey === device.pubkey)
+            ) {
               this.iotDevices.push(device)
             }
           }
         }
-
-        console.log('Discovered IoT devices:', this.iotDevices)
 
         if (this.iotDevices.length === 0) {
           this.$q.notify({
@@ -496,15 +590,15 @@ window.app = Vue.createApp({
     // Execute capability (send DVM request) - for get methods
     async executeCapability(device, capability) {
       const stateKey = `${device.pubkey}:${capability}`
-      this.setCapabilityState(stateKey, { loading: true })
+      this.setCapabilityState(stateKey, {loading: true})
 
-      const method = JSON.stringify([{ method: capability }])
+      const method = JSON.stringify([{method: capability}])
 
       try {
         // Create DVM request event (kind 5107)
         const event = {
           kind: 5107,
-          content: "",
+          content: '',
           tags: [
             ['i', method, 'text'],
             ['output', 'text/plain'],
@@ -520,7 +614,6 @@ window.app = Vue.createApp({
 
         // Publish using SimplePool
         await this.pool.publish(this.relays, signedEvent)
-        console.log('Published DVM request for capability:', capability)
 
         // Register request for global subscription handling
         this.pendingRequests.set(signedEvent.id, {
@@ -541,14 +634,13 @@ window.app = Vue.createApp({
             })
           }
         }, 30000) // 30 second timeout
-
       } catch (error) {
         console.error('Failed to execute capability:', error)
         this.$q.notify({
           type: 'negative',
           message: 'Failed to execute ' + capability
         })
-        this.setCapabilityState(stateKey, { loading: false })
+        this.setCapabilityState(stateKey, {loading: false})
       }
     },
 
@@ -566,16 +658,16 @@ window.app = Vue.createApp({
         return
       }
 
-      this.setCapabilityState(stateKey, { loading: true })
+      this.setCapabilityState(stateKey, {loading: true})
 
       // Create method object with value
-      const method = JSON.stringify([{ method: capability, value: inputValue }])
+      const method = JSON.stringify([{method: capability, value: inputValue}])
 
       try {
         // Create DVM request event (kind 5107)
         const event = {
           kind: 5107,
-          content: "",
+          content: '',
           tags: [
             ['i', method, 'text'],
             ['output', 'text/plain'],
@@ -591,7 +683,6 @@ window.app = Vue.createApp({
 
         // Publish using SimplePool
         await this.pool.publish(this.relays, signedEvent)
-        console.log('Published DVM set request for capability:', capability, 'with value:', inputValue)
 
         // Register request for global subscription handling
         this.pendingRequests.set(signedEvent.id, {
@@ -612,14 +703,13 @@ window.app = Vue.createApp({
             })
           }
         }, 30000) // 30 second timeout
-
       } catch (error) {
         console.error('Failed to execute set capability:', error)
         this.$q.notify({
           type: 'negative',
           message: 'Failed to execute ' + capability
         })
-        this.setCapabilityState(stateKey, { loading: false })
+        this.setCapabilityState(stateKey, {loading: false})
       }
     },
 
@@ -628,8 +718,6 @@ window.app = Vue.createApp({
       if (!this.pool || this.globalDVMSubscription) return
 
       try {
-        console.log('Setting up global DVM subscription for 6107 events')
-
         // Subscribe to all 6107 events since now
         const filter = {
           kinds: [6107],
@@ -637,27 +725,21 @@ window.app = Vue.createApp({
         }
 
         this.globalDVMSubscription = this.pool.subscribe(this.relays, filter, {
-          onevent: (event) => {
+          onevent: event => {
             this.handleDVMResponse(event)
           },
-          oneose: () => {
-            console.log('Global DVM subscription: End of stored events')
-          },
-          onclose: (reason) => {
-            console.log('Global DVM subscription closed:', reason)
+          oneose: () => {},
+          onclose: reason => {
             // Attempt to reconnect after a delay if not manually closed
             if (reason !== 'manual' && this.isAuthenticated) {
               setTimeout(() => {
                 if (this.isAuthenticated && !this.globalDVMSubscription) {
-                  console.log('Reconnecting global DVM subscription')
                   this.setupGlobalDVMSubscription()
                 }
               }, 5000)
             }
           }
         })
-
-        console.log('Global DVM subscription established')
       } catch (error) {
         console.error('Failed to setup global DVM subscription:', error)
       }
@@ -666,8 +748,6 @@ window.app = Vue.createApp({
     // Handle incoming DVM responses
     handleDVMResponse(event) {
       try {
-        console.log('Received DVM response event:', event)
-
         // Validate event structure
         if (!event || !event.kind || event.kind !== 6107) {
           console.warn('Invalid event structure:', event)
@@ -685,13 +765,11 @@ window.app = Vue.createApp({
         const pendingRequest = this.pendingRequests.get(requestId)
 
         if (!pendingRequest) {
-          console.log('No pending request found for response:', requestId)
           return
         }
 
         // Process the response
         this.processDVMResponse(event, pendingRequest)
-
       } catch (error) {
         console.error('Error handling DVM response:', error)
       }
@@ -699,14 +777,13 @@ window.app = Vue.createApp({
 
     // Process DVM response for a specific request
     processDVMResponse(event, pendingRequest) {
-      const { device, capability, stateKey } = pendingRequest
+      const {device, capability, stateKey} = pendingRequest
 
       try {
         // Check if response contains bolt11 invoice in amount tag (for kind 6107)
         const amountTag = event.tags.find(tag => tag[0] === 'amount')
         if (amountTag && amountTag[2]) {
           // Payment required - keep request pending for actual response after payment
-          console.log('Payment required, keeping request pending for final response')
           this.showInvoiceQR(amountTag[2], amountTag[1])
           this.setCapabilityState(stateKey, {
             loading: true, // Keep loading state since we're waiting for final response
@@ -714,9 +791,6 @@ window.app = Vue.createApp({
           })
           // DO NOT remove from pendingRequests - we still need to wait for final response
         } else {
-          // Final response received - complete the request
-          console.log('Final response received for request:', event.tags.find(tag => tag[0] === 'e')[1])
-
           // Remove from pending requests
           this.pendingRequests.delete(event.tags.find(tag => tag[0] === 'e')[1])
 
@@ -728,10 +802,7 @@ window.app = Vue.createApp({
             loading: false,
             result: event.content || 'Success'
           })
-
-          console.log(`Capability ${capability} completed:`, event.content)
         }
-
       } catch (error) {
         console.error('Error processing DVM response:', error)
         this.setCapabilityState(stateKey, {
@@ -743,7 +814,6 @@ window.app = Vue.createApp({
       }
     },
 
-
     // Show invoice QR code
     showInvoiceQR(bolt11, amount) {
       try {
@@ -753,11 +823,15 @@ window.app = Vue.createApp({
         this.invoiceDialog.show = true
 
         // Set default wallet if none selected and wallets are available (LNbits users only)
-        if (!this.selectedWallet && this.g && this.g.user && this.g.user.wallets && this.g.user.wallets.length > 0) {
+        if (
+          !this.selectedWallet &&
+          this.g &&
+          this.g.user &&
+          this.g.user.wallets &&
+          this.g.user.wallets.length > 0
+        ) {
           this.selectedWallet = this.g.user.wallets[0].id
         }
-
-        console.log('Showing invoice QR for:', bolt11, 'amount:', amount)
       } catch (error) {
         console.error('Failed to display invoice QR code:', error)
         this.$q.notify({
@@ -781,7 +855,9 @@ window.app = Vue.createApp({
 
       try {
         // Find the selected wallet object to get the admin key
-        const wallet = this.g.user.wallets.find(w => w.id === this.selectedWallet)
+        const wallet = this.g.user.wallets.find(
+          w => w.id === this.selectedWallet
+        )
         if (!wallet) {
           throw new Error('Selected wallet not found')
         }
@@ -805,21 +881,20 @@ window.app = Vue.createApp({
 
           // Close the invoice dialog
           this.invoiceDialog.show = false
-
-          // The DVM response should come automatically after payment
-          console.log('Payment completed:', response.data.payment_hash)
-
         } else {
           throw new Error(response.data.error || 'Payment failed')
         }
-
       } catch (error) {
         console.error('Payment failed:', error)
 
         // Extract error message from API response
         let errorMessage = 'Payment failed'
 
-        if (error.response && error.response.data && error.response.data.detail) {
+        if (
+          error.response &&
+          error.response.data &&
+          error.response.data.detail
+        ) {
           // Handle 400 errors with detail message
           errorMessage = error.response.data.detail
         } else if (error.message) {
@@ -855,26 +930,25 @@ window.app = Vue.createApp({
       return state?.result || null
     },
 
-
     // Discover all IoT service providers from the network
     async discoverServiceProviders() {
       this.loadingProviders = true
       try {
-        const since = Math.floor(Date.now() / 1000) - (60 * 60 * 6) // 6 hours ago
+        const since = Math.floor(Date.now() / 1000) - 60 * 60 * 6 // 6 hours ago
         const filter = {
           kinds: [31990],
           since: since
         }
 
-        console.log('Querying for service providers since:', new Date(since * 1000))
         const events = await this.pool.querySync(this.relays, filter)
-        console.log('Fetched service provider events:', events.length)
 
         // Deduplicate by pubkey (keep most recent per author)
         const providerMap = new Map()
         for (const event of events) {
           // Filter for IoT devices (tag 'k' = '5107')
-          const kTag = event.tags.find(tag => tag[0] === 'k' && tag[1] === '5107')
+          const kTag = event.tags.find(
+            tag => tag[0] === 'k' && tag[1] === '5107'
+          )
           if (kTag) {
             const existing = providerMap.get(event.pubkey)
             if (!existing || event.created_at > existing.created_at) {
@@ -894,8 +968,6 @@ window.app = Vue.createApp({
 
         // Sort by most recent first
         this.serviceProviders.sort((a, b) => b.created_at - a.created_at)
-
-        console.log('Discovered service providers:', this.serviceProviders.length)
 
         if (this.serviceProviders.length === 0) {
           this.$q.notify({
@@ -940,19 +1012,11 @@ window.app = Vue.createApp({
       this.followingStates[provider.pubkey] = true
 
       try {
-        // Fetch current follow list
-        const filter = {
-          kinds: [3],
-          authors: [this.userPubkey],
-          limit: 1
-        }
-
-        const events = await this.pool.querySync(this.relays, filter)
-        let followEvent = null
+        // Fetch current follow list from multiple relays
+        const followEvent = await this.fetchContactListsFromMultipleRelays()
         let existingTags = []
 
-        if (events.length > 0) {
-          followEvent = events[0]
+        if (followEvent) {
           existingTags = followEvent.tags.filter(tag => tag[0] === 'p')
         }
 
@@ -978,19 +1042,17 @@ window.app = Vue.createApp({
           pubkey: this.userPubkey
         }
 
-        // Sign and publish the event
+        // Sign and publish the event to multiple relays
         const signedEvent = await this.signEvent(newFollowEvent)
-        await this.pool.publish(this.relays, signedEvent)
+        await this.publishContactListToMultipleRelays(signedEvent)
 
         // Update local follow list
         this.followList.push(provider.pubkey)
 
-        console.log('Successfully followed provider:', provider.name)
         this.$q.notify({
           type: 'positive',
           message: `Now following ${provider.name}`
         })
-
       } catch (error) {
         console.error('Failed to follow provider:', error)
         this.$q.notify({
@@ -1009,19 +1071,11 @@ window.app = Vue.createApp({
       this.followingStates[provider.pubkey] = true
 
       try {
-        // Fetch current follow list
-        const filter = {
-          kinds: [3],
-          authors: [this.userPubkey],
-          limit: 1
-        }
-
-        const events = await this.pool.querySync(this.relays, filter)
-        let followEvent = null
+        // Fetch current follow list from multiple relays
+        const followEvent = await this.fetchContactListsFromMultipleRelays()
         let existingTags = []
 
-        if (events.length > 0) {
-          followEvent = events[0]
+        if (followEvent) {
           existingTags = followEvent.tags.filter(tag => tag[0] === 'p')
         }
 
@@ -1032,7 +1086,9 @@ window.app = Vue.createApp({
             message: 'Not following this provider'
           })
           // Remove from local follow list if it exists
-          this.followList = this.followList.filter(pubkey => pubkey !== provider.pubkey)
+          this.followList = this.followList.filter(
+            pubkey => pubkey !== provider.pubkey
+          )
           return
         }
 
@@ -1048,19 +1104,19 @@ window.app = Vue.createApp({
           pubkey: this.userPubkey
         }
 
-        // Sign and publish the event
+        // Sign and publish the event to multiple relays
         const signedEvent = await this.signEvent(newFollowEvent)
-        await this.pool.publish(this.relays, signedEvent)
+        await this.publishContactListToMultipleRelays(signedEvent)
 
         // Update local follow list
-        this.followList = this.followList.filter(pubkey => pubkey !== provider.pubkey)
+        this.followList = this.followList.filter(
+          pubkey => pubkey !== provider.pubkey
+        )
 
-        console.log('Successfully unfollowed provider:', provider.name)
         this.$q.notify({
           type: 'positive',
           message: `Unfollowed ${provider.name}`
         })
-
       } catch (error) {
         console.error('Failed to unfollow provider:', error)
         this.$q.notify({
@@ -1082,11 +1138,8 @@ window.app = Vue.createApp({
     handlePageVisible() {
       if (!this.isAuthenticated || !this.pool) return
 
-      console.log('Checking connection health after page became visible')
-
       // Check if global subscription is still active
       if (!this.globalDVMSubscription) {
-        console.log('Global DVM subscription not active, reconnecting')
         this.setupGlobalDVMSubscription()
         return
       }
@@ -1101,7 +1154,6 @@ window.app = Vue.createApp({
 
       // Close and recreate the global subscription to ensure fresh connections
       if (this.globalDVMSubscription) {
-        console.log('Refreshing global DVM subscription for connection health')
         this.globalDVMSubscription.close()
         this.globalDVMSubscription = null
       }
@@ -1112,16 +1164,9 @@ window.app = Vue.createApp({
   },
 
   async created() {
-    // Check if required libraries are loaded
-    console.log('NostrTools available:', typeof window.NostrTools !== 'undefined')
-    console.log('SimplePool available:', typeof window.NostrTools?.SimplePool !== 'undefined')
-    console.log('QRCode available:', typeof window.QRCode !== 'undefined')
-    console.log('Nostr extension available:', typeof window.nostr !== 'undefined')
-
     // Setup page visibility event listener for mobile browser handling
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && this.isAuthenticated) {
-        console.log('Page became visible, checking connections')
         this.handlePageVisible()
       }
     })
